@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SiteLook Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .hero {
+            background-color: #00d1b2;
+        }
+        .hero-body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .dashboard {
+            margin-top: 50px;
+        }
+        .dashboard-item {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <section class="hero is-medium">
+        <div class="hero-body">
+            <div class="container has-text-centered">
+                <h1 class="title is-1 has-text-white">SiteLook Dashboard</h1>
+                <h2 class="subtitle is-3 has-text-white">Monitor your websites with ease</h2>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <div class="dashboard">
+                <!-- The dashboard items will be added here dynamically -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Add the JavaScript code here -->
+    <script>
+
+        // Function to fetch data from the server and update the dashboard
+        async function updateDashboard() {
+            // Fetch data from the server
+            const response = await fetch('/api/dashboard');
+            const data = await response.json();
+
+            // Get the dashboard container element
+            const dashboard = document.querySelector('.dashboard');
+
+            // Clear the dashboard container
+            dashboard.innerHTML = '';
+
+            // Loop through the data and create a dashboard item for each monitored website
+            for (const website of data.websites) {
+                // Create a new dashboard item element
+                const dashboardItem = document.createElement('div');
+                dashboardItem.classList.add('dashboard-item', 'box');
+
+                // Add the website details to the dashboard item
+                const title = document.createElement('h3');
+                title.classList.add('title', 'is-4');
+                title.textContent = website.url;
+                dashboardItem.appendChild(title);
+
+                const method = document.createElement('p');
+                method.textContent = `Method: ${website.method}`;
+                dashboardItem.appendChild(method);
+
+                const lastPingTime = document.createElement('p');
+                lastPingTime.textContent = `Last ping time: ${website.last_ping_time} (IST)`;
+                dashboardItem.appendChild(lastPingTime);
+
+                const responseStatus = document.createElement('p');
+                responseStatus.textContent = `Response status: ${website.response_status}`;
+                dashboardItem.appendChild(responseStatus);
+
+                // Add the action buttons to the dashboard item
+                const buttons = document.createElement('div');
+                buttons.classList.add('buttons');
+
+                const removeButton = document.createElement('button');
+                removeButton.classList.add('button', 'is-danger');
+                removeButton.textContent = 'Remove';
+                removeButton.addEventListener('click', () => removeWebsite(website.url));
+                buttons.appendChild(removeButton);
+
+                const startStopButton = document.createElement('button');
+                startStopButton.classList.add('button', 'is-info');
+                startStopButton.textContent = website.stopped ? 'Start' : 'Stop';
+                startStopButton.addEventListener('click', () => startStopWebsite(website.url));
+                buttons.appendChild(startStopButton);
+
+                const alertsButton = document.createElement('button');
+                alertsButton.classList.add('button', 'is-link');
+                alertsButton.textContent = website.alerts_on ? 'Turn off alerts' : 'Turn on alerts';
+                alertsButton.addEventListener('click', () => toggleAlerts(website.url));
+                buttons.appendChild(alertsButton);
+
+                const scheduleButton = document.createElement('button');
+                scheduleButton.classList.add('button', 'is-primary');
+                scheduleButton.textContent = 'Schedule';
+                scheduleButton.addEventListener('click', () => setSchedule(website.url));
+                buttons.appendChild(scheduleButton);
+
+                const historyButton = document.createElement('button');
+                historyButton.classList.add('button', 'is-warning');
+                historyButton.textContent = 'History';
+                historyButton.addEventListener('click', () => showHistory(website.url));
+                buttons.appendChild(historyButton);
+
+                const analyticsButton = document.createElement('button');
+                analyticsButton.classList.add('button', 'is-success');
+                analyticsButton.textContent = 'Analytics';
+                analyticsButton.addEventListener('click', () => showAnalytics(website.url));
+                buttons.appendChild(analyticsButton);
+
+                dashboardItem.appendChild(buttons);
+
+                // Add the dashboard item to the dashboard container
+                dashboard.appendChild(dashboardItem);
+            }
+        }
+
+        // Function to remove a website from monitoring
+        async function removeWebsite(url) {
+            // Send a request to the server to remove the website
+            await fetch('/api/remove', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url })
+            });
+
+            // Update the dashboard
+            updateDashboard();
+        }
+
+        // Function to start or stop monitoring a website
+        async function startStopWebsite(url) {
+            // Send a request to the server to start or stop monitoring the website
+            await fetch('/api/startstop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url })
+            });
+
+            // Update the dashboard
+            updateDashboard();
+        }
+
+        // Function to turn on or off alerts for a website
+        async function toggleAlerts(url) {
+            // Send a request to the server to turn on or off alerts for the website
+            await fetch('/api/alerts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url })
+            });
+
+            // Update the dashboard
+            updateDashboard();
+        }
+
+        // Function to set a schedule for monitoring a website
+        async function setSchedule(url) {
+            // Prompt the user for a cron expression
+            const cronExpression = prompt('Enter a cron expression for the monitoring schedule');
+
+            // Send a request to the server to set the schedule for the website
+            await fetch('/api/schedule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url, cronExpression })
+            });
+
+            // Update the dashboard
+            updateDashboard();
+        }
+
+        // Function to show the history of a website
+        async function showHistory(url) {
+            // Fetch the history data from the server
+            const response = await fetch(`/api/history?url=${encodeURIComponent(url)}`);
+            const data = await response.json();
+
+            // Format and display the history data in an alert dialog
+            let historyMessage = `History for ${url}:\n\n`;
+            for (const entry of data.history) {
+                historyMessage += `${entry.time}: ${entry.status}\n`;
+            }
+            alert(historyMessage);
+        }
+
+        // Function to show the analytics of a website
+        async function showAnalytics(url) {
+            // Fetch the analytics data from the server
+            const response = await fetch(`/api/analytics?url=${encodeURIComponent(url)}`);
+            const data = await response.json();
+
+            // Format and display the analytics data in an alert dialog
+            let analyticsMessage = `Analytics for ${url}:\n\n`;
+            analyticsMessage += `Average response time: ${data.average_response_time}ms\n`;
+            analyticsMessage += `Error rate: ${data.error_rate}\n`;
+            analyticsMessage += `Uptime percentage: ${data.uptime_percentage}\n`;
+            alert(analyticsMessage);
+        }
+
+        // Call the updateDashboard function initially to populate the dashboard with data
+        updateDashboard();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+py-cord
+aiohttp
+flask
+croniter
+pytz
+requests
