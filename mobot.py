@@ -15,14 +15,14 @@ from pymongo import MongoClient
 
 # MongoDB connection string
 mongo_url = "mongodb://Haruki:Athulkrishna11@pnode2.danbot.host:7650"
-client = MongoClient(mongo_url)
-db = client['sldb']  # Replace with your database name
+mongo = MongoClient(mongo_url)
+db = mongo['sldb']  # Replace with your database name
 
 intents = discord.Intents.default()
 intents.messages = True
 intents.members = True
-bot = commands.Bot(command_prefix='up!', intents=intents)
-bot.activity = discord.Activity(type=discord.ActivityType.watching, name="Websites")
+client = commands.Bot(command_prefix='up!', intents=intents)
+cleint.activity = discord.Activity(type=discord.ActivityType.watching, name="Websites")
 
 # Define a function to ping a website with a given method and time interval
 async def ping_website(url, method, time_interval, ping_count, user_id, website):
