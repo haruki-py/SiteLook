@@ -22,7 +22,7 @@ intents = discord.Intents.default()
 intents.messages = True
 intents.members = True
 client = commands.Bot(command_prefix='up!', intents=intents)
-cleint.activity = discord.Activity(type=discord.ActivityType.watching, name="Websites")
+client.activity = discord.Activity(type=discord.ActivityType.watching, name="Websites")
 
 # Define a function to ping a website with a given method and time interval
 async def ping_website(url, method, time_interval, ping_count, user_id, website):
@@ -748,4 +748,4 @@ async def stats(ctx):
         await ctx.send(f'{ctx.author.mention} Check your DMs!')
 
 
-client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.G_Ax2P.oPyfxddQXqU3nFBHlqMpJvNECmyef5Ji5e24qM")
+client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GCpMjC.57AXm1xzu2QDeXOAXy25Go8w7rfI6HopuCHLl8")
