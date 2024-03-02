@@ -14,7 +14,7 @@ from discord.ext import commands
 from pymongo import MongoClient
 
 # MongoDB connection string
-mongo_url = "mongodb://Haruki:Athulkrishna@11@pnode2.danbot.host:7650"
+mongo_url = "mongodb://Haruki:Athulkrishna11@pnode2.danbot.host:7650"
 client = MongoClient(mongo_url)
 db = client['sldb']  # Replace with your database name
 

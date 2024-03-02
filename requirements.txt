@@ -4,3 +4,4 @@ flask
 croniter
 pytz
 requests
+pymongo
