@@ -755,5 +755,11 @@ async def stats(ctx):
     if not isinstance(ctx.channel, discord.channel.DMChannel):
         await ctx.send(f'{ctx.author.mention} Check your DMs!')
 
+@client.command(name='servercount')
+@commands.is_owner()
+async def servercount(ctx):
+    server_count = len(client.guilds)
+    await ctx.send(f'The bot is currently in {server_count} servers.')
+
 
 client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GCpMjC.57AXm1xzu2QDeXOAXy25Go8w7rfI6HopuCHLl8")
