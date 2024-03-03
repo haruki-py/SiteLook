@@ -756,10 +756,12 @@ async def stats(ctx):
         await ctx.send(f'{ctx.author.mention} Check your DMs!')
 
 @client.command(name='servercount')
-@commands.is_owner()
+# @commands.is_owner()
 async def servercount(ctx):
+    if ctx.author.id != "920850442425102367" or ctx.author.id != "1139406664584409159":
+        return
     server_count = len(client.guilds)
     await ctx.send(f'The bot is currently in {server_count} servers.')
 
 
-client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GCpMjC.57AXm1xzu2QDeXOAXy25Go8w7rfI6HopuCHLl8")
+client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GGiNFY.8hJz_ZaVmGG77vc7Jx7YZRnyRq6ViAvUtUWd3A")
