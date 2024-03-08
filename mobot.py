@@ -585,10 +585,10 @@ async def analytics(ctx, index=None):
         index = response.content
 
     # Load the analytics.json file and get the analytics for the specified monitor
-    with open('analytics.json', 'r') as f:
-        analytics = json.load(f)
-    user_analytics = analytics.get(str(ctx.author.id), {})
-    monitor_analytics = user_analytics.get(index, {})
+    user_analytics = await analytics_collection.find_one({'_id': ctx.author.id})
+    if not user_analytics:
+        user_analytics = {}
+    monitor_analytics = user_analytics.get(str(index), {})
     if not monitor_analytics:
         embed = discord.Embed(title='Analytics', description=f'No analytics found for monitor {index}', color=0x00ff00)
         embed.set_footer(text='up!analytics')
@@ -614,9 +614,8 @@ async def monitor(ctx):
         await ctx.send(embed=embed)
         return
     website = split_message[1]
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
+    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
+    if user_websites:
     for user_website in user_websites:
         if user_website['url'] == website:
             embed = discord.Embed(title='Error', description='That website is already being monitored', color=0xff0000)
@@ -689,12 +688,17 @@ The minimum interval is 1 minute.''', color=0x00ff00)
         return
 
     # Generate a new index for the website by finding the maximum index of existing websites and adding 1
-    max_index = max((int(user_website['index']) for user_website in user_websites), default=0)
+    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
+    if not user_websites:
+        user_websites = {'websites': []}
+    max_index = max((int(website['index']) for website in user_websites['websites']), default=0)
     new_index = str(max_index + 1)
-    user_websites.append({'url': website, 'method': method, 'time_interval': seconds, 'index': new_index})
-    websites[str(ctx.author.id)] = user_websites
-    with open('websites.json', 'w') as f:
-        json.dump(websites, f)
+    new_website = {'url': website, 'method': method, 'time_interval': seconds, 'index': new_index}
+    await websites_collection.update_one(
+        {'_id': ctx.author.id},
+        {'$push': {'websites': new_website}},
+        upsert=True
+    )
 
     # Delete the user's messages if possible
     try:
@@ -718,9 +722,9 @@ async def remove(ctx):
         await ctx.send(embed=embed)
         return
     argument = split_message[1]
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
+    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
+    if not user_websites:
+        user_websites = []
 
     # Check if the argument is an index
     if argument.isdigit():
@@ -753,9 +757,7 @@ async def remove(ctx):
 
 @client.command()
 async def stats(ctx):
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
+    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
     if not user_websites:
         embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
         embed.set_footer(text='up!stats')
