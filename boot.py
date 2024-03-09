@@ -1,4 +1,4 @@
-from webapp import keep_alive
+# from webapp import keep_alive
 import time
 import discord
 import json
