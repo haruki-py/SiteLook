@@ -180,7 +180,6 @@ async def send_requests():
                 url = user_website['url']
                 method = user_website['method']
                 time_interval = user_website['time_interval']
-                # Rest of your logic...
 
             # Check if the monitor is scheduled to run
             user_schedule_document = await schedules_collection.find_one({'user_id': user_id})
