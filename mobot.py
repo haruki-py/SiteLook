@@ -184,15 +184,15 @@ async def send_requests():
 
             # Check if the monitor is scheduled to run
             user_schedule_document = await schedules_collection.find_one({'user_id': user_id})
-        if user_schedule_document:
-            user_schedules = user_schedule_document.get('schedules', {})
-            schedule = user_schedules.get(website.get('index', None))
-            if schedule:
-                now = datetime.now(timezone('Asia/Kolkata'))
-                iter = croniter(schedule, now)
-                next_run = iter.get_next(datetime)
-                if now < next_run:
-                    continue
+            if user_schedule_document is not None:
+                user_schedules = user_schedule_document.get('schedules', {})
+                schedule = user_schedules.get(website.get('index', None))
+                if schedule:
+                    now = datetime.now(timezone('Asia/Kolkata'))
+                    iter = croniter(schedule, now)
+                    next_run = iter.get_next(datetime)
+                    if now < next_run:
+                        continue
 
                     # If the website is stopped, cancel its task if it exists
                     if 'stopped' in website and website['stopped']:
