@@ -759,7 +759,7 @@ async def stats(ctx):
 # @commands.is_owner()
 async def servercount(ctx):
     if ctx.author.id != "920850442425102367" or ctx.author.id != "1139406664584409159":
-                return
+        return
 
     # Calculate the total number of members across all servers
     total_members = sum(guild.member_count for guild in client.guilds)
