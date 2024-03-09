@@ -10,7 +10,7 @@ from croniter import croniter
 # import os
 from pytz import timezone
 import asyncio
-from discord import Intents
+# from discord import Intents
 from discord.ext import commands
 import motor.motor_asyncio
 
@@ -76,7 +76,7 @@ async def ping_website(url, method, time_interval, ping_count, user_id, website)
                 # Update the analytics data for this monitor
                 user_an_data = await an_data_collection.find_one({'_id': user_id})
                 if user_an_data:
-                monitor_an_data = user_an_data.get(website_index, {})
+                    monitor_an_data = user_an_data.get(website_index, {})
                 error_count = monitor_an_data.get('error_count', 0)
                 ping_count = monitor_an_data.get('ping_count', 0)
                 return error_count, ping_count
@@ -94,11 +94,11 @@ async def ping_website(url, method, time_interval, ping_count, user_id, website)
                 'uptime_percentage': f'{uptime_percentage}%'
                 }
 
-                 # Update the document in MongoDB
-                 await analytics_collection.update_one(
-                  {'_id': str(user_id)},
-                  {'$set': {website_index: monitor_analytics}},
-                     upsert=True
+                # Update the document in MongoDB
+                await analytics_collection.update_one(
+                 {'_id': str(user_id)},
+                 {'$set': {website_index: monitor_analytics}},
+                  upsert=True
                  )
 
                 status = 'UP' if response.status == 200 else 'DOWN'
@@ -173,27 +173,26 @@ async def send_requests():
         # Loop through the websites for each user
         for website in websites:
             user_id = website['user_id']
-            user_websites = website['websites']
+            user_websites = website.get('websites', [])  # Use .get() to avoid KeyError
 
-                # Loop through the websites for each user
-                for website in user_websites:
+            # Loop through each website for the current user
+            for user_website in user_websites:
+                url = user_website['url']
+                method = user_website['method']
+                time_interval = user_website['time_interval']
+                # Rest of your logic...
 
-                    # Get the url, method and time interval of the website
-                    url = website['url']
-                    method = website['method']
-                    time_interval = website['time_interval']
-
-                    # Check if the monitor is scheduled to run
-        user_schedule_document = await schedules_collection.find_one({'user_id': user_id})
+            # Check if the monitor is scheduled to run
+            user_schedule_document = await schedules_collection.find_one({'user_id': user_id})
         if user_schedule_document:
             user_schedules = user_schedule_document.get('schedules', {})
             schedule = user_schedules.get(website.get('index', None))
-                    if schedule:
-                        now = datetime.now(timezone('Asia/Kolkata'))
-                        iter = croniter(schedule, now)
-                        next_run = iter.get_next(datetime)
-                        if now < next_run:
-                            continue
+            if schedule:
+                now = datetime.now(timezone('Asia/Kolkata'))
+                iter = croniter(schedule, now)
+                next_run = iter.get_next(datetime)
+                if now < next_run:
+                    continue
 
                     # If the website is stopped, cancel its task if it exists
                     if 'stopped' in website and website['stopped']:
@@ -616,12 +615,12 @@ async def monitor(ctx):
     website = split_message[1]
     user_websites = await websites_collection.find_one({'_id': ctx.author.id})
     if user_websites:
-    for user_website in user_websites:
-        if user_website['url'] == website:
-            embed = discord.Embed(title='Error', description='That website is already being monitored', color=0xff0000)
-            embed.set_footer(text='up!monitor')
-            await ctx.send(embed=embed)
-            return
+        for user_website in user_websites:
+            if user_website['url'] == website:
+                embed = discord.Embed(title='Error', description='That website is already being monitored', color=0xff0000)
+                embed.set_footer(text='up!monitor')
+                await ctx.send(embed=embed)
+                return
     embed = discord.Embed(title='Method', description='''Which one? 
 1. HEAD
 2. GET
