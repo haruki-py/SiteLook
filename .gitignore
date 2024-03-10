@@ -1,3 +1,5 @@
 /nohup.out
 /uwsgi.ini
 /__pycache__
+/nohup.out
+/.cache
