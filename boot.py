@@ -757,18 +757,14 @@ async def stats(ctx):
 
 @client.command(name='servercount')
 # @commands.is_owner()
-async def servercount(ctx):
-    if ctx.author.id != "920850442425102367" or ctx.author.id != "1139406664584409159":
-        return
-
-    # Calculate the total number of members across all servers
-    # total_members = sum(guild.member_count for guild in client.guilds)
-    total_members = len(client.users)
-
+async def botstats(ctx):
+    if ctx.author.id != 1920850442425102367 or 1139406664584409159:
+        stop
+        
     # Create the embed
-    embed = discord.Embed(title='Server and Member Count', color=0x00ff00)
+    embed = discord.Embed(title='Bot Stats', color=0x00ff00)
     embed.add_field(name='Servers', value=f'{len(client.guilds)}', inline=True)
-    embed.add_field(name='Total Members', value=f'{total_members}', inline=True)
+    embed.add_field(name='Total Members', value=f'{len(client.users)}', inline=True)
     embed.set_footer(text='Server count and total member count')
 
     # Send the embed
