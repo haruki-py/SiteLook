@@ -13,9 +13,9 @@ import asyncio
 from discord import Intents
 from discord.ext import commands
 
-intents = discord.Intents.default()
-intents.messages = True
-intents.members = True
+intents = discord.Intents.all()
+# intents.message_content = True
+# intents.members = True
 client = commands.Bot(command_prefix='up!', intents=intents)
 client.activity = discord.Activity (type=discord.ActivityType.watching, name="Websites")
 
