@@ -762,7 +762,8 @@ async def servercount(ctx):
         return
 
     # Calculate the total number of members across all servers
-    total_members = sum(guild.member_count for guild in client.guilds)
+    # total_members = sum(guild.member_count for guild in client.guilds)
+    total_members = len(client.users)
 
     # Create the embed
     embed = discord.Embed(title='Server and Member Count', color=0x00ff00)
