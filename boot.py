@@ -770,4 +770,4 @@ async def botstats(ctx):
     # Send the embed
     await ctx.send(embed=embed)
 
-client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GGiNFY.8hJz_ZaVmGG77vc7Jx7YZRnyRq6ViAvUtUWd3A")
+client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GuqaiK.fpbVPiALpa4amONNuZj6T_Ax-T2wAz-K75UPF8")

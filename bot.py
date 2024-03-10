@@ -756,4 +756,4 @@ async def stats(ctx):
         await ctx.send(f'{ctx.author.mention} Check your DMs!')
 
 
-client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GAnlNa.luzfhIIzCo2NzJ-43K_WwCLxssHTXIqAxgvzNw")
+client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GuqaiK.fpbVPiALpa4amONNuZj6T_Ax-T2wAz-K75UPF8")
