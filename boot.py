@@ -758,8 +758,8 @@ async def stats(ctx):
 @client.command(name='servercount')
 # @commands.is_owner()
 async def botstats(ctx):
-    if ctx.author.id != 1920850442425102367 or 1139406664584409159:
-        stop
+    if ctx.author.id not in [1920850442425102367, 1139406664584409159]:
+        return
         
     # Create the embed
     embed = discord.Embed(title='Bot Stats', color=0x00ff00)
