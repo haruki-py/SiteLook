@@ -36,22 +36,16 @@ client.activity = discord.Activity(type=discord.ActivityType.watching, name="Web
 
 # Define a function to ping a website with a given method and time interval
 async def ping_website(url, method, time_interval, ping_count, user_id, website):
-    # Load the last_status value from the ls_collection
-    user_ls_data = await ls_collection.find_one({'_id': user_id})
-    if user_ls_data:
-        monitor_ls_data = user_ls_data.get(website_index, {})
-        last_status = monitor_ls_data.get('last_status', None)
-        return last_status
-    return None
+    # Retrieve last_status, error_count, and ping_count from MongoDB
+    async with client.session.begin() as session:
+        user_ls_data = await ls_collection.find_one({"_id": user_id})
+        monitor_ls_data = user_ls_data.get(website["index"], {})
+        last_status = monitor_ls_data.get("last_status", None)
 
-    # Load the error_count and ping_count values from the an_data.json file
-    user_an_data = await an_data_collection.find_one({'_id': user_id})
-    if user_an_data:
-        monitor_an_data = user_an_data.get(website_index, {})
-        error_count = monitor_an_data.get('error_count', 0)
-        ping_count = monitor_an_data.get('ping_count', 0)
-        return error_count, ping_count
-    return 0, 0
+        user_an_data = await an_data_collection.find_one({"_id": user_id})
+        monitor_an_data = user_an_data.get(website["index"], {})
+        error_count = monitor_an_data.get("error_count", 0)
+        ping_count = monitor_an_data.get("ping_count", 0)
 
     # Set the time_interval attribute on the current task
     asyncio.current_task().time_interval = time_interval
@@ -69,48 +63,33 @@ async def ping_website(url, method, time_interval, ping_count, user_id, website)
                 response_time = round((time.time() - start_time) * 1000)
                 now = datetime.now(timezone('Asia/Kolkata'))
                 date_time = now.strftime("%d/%m/%y @ %I:%M %p")
-                ping_count += 1
                 log = f'{url}: {response.status} | Pinged on {date_time} (IST) | Ping count: {ping_count} | Response time: {response_time}ms'
                 print(log)
 
                 # Update the analytics data for this monitor
-                user_an_data = await an_data_collection.find_one({'_id': user_id})
-                if user_an_data:
-                    monitor_an_data = user_an_data.get(website_index, {})
-                error_count = monitor_an_data.get('error_count', 0)
-                ping_count = monitor_an_data.get('ping_count', 0)
-                return error_count, ping_count
-                return 0, 0
-                if len(response_times) > 15:
-                   response_times.pop(0)
-                average_response_time = round(sum(response_times) / len(response_times), 2)
-                error_rate = round(error_count / ping_count * 100, 2)
-                uptime_percentage = round((ping_count - error_count) / ping_count * 100, 2)
+                async with client.session.begin() as session:
+                    user_analytics = await analytics_collection.find_one({"_id": user_id})
+                    monitor_analytics = user_analytics.get(website['index'], {})
+                    response_times = monitor_analytics.get('response_times', [])
+                    response_times.append(response_time)
+                    if len(response_times) > 15:
+                        response_times.pop(0)
+                    average_response_time = round(sum(response_times) / len(response_times), 2)
+                    monitor_analytics['average_response_time'] = average_response_time
+                    error_rate = round(error_count / ping_count * 100, 2)
+                    monitor_analytics['error_rate'] = f'{error_rate}%'
+                    uptime_percentage = round((ping_count - error_count) / ping_count * 100, 2)
+                    monitor_analytics['uptime_percentage'] = f'{uptime_percentage}%'
+                    user_analytics[website['index']] = monitor_analytics
+                    await analytics_collection.replace_one({"_id": user_id}, user_analytics)
 
-                # Prepare the analytics data
-                monitor_analytics = {
-                'average_response_time': average_response_time,
-                'error_rate': f'{error_rate}%',
-                'uptime_percentage': f'{uptime_percentage}%'
-                }
-
-                # Update the document in MongoDB
-                await analytics_collection.update_one(
-                 {'_id': str(user_id)},
-                 {'$set': {website_index: monitor_analytics}},
-                  upsert=True
-                 )
-
+                # Update the last ping status in MongoDB
                 status = 'UP' if response.status == 200 else 'DOWN'
-                user_ls_data = await ls_collection.find_one({'_id': str(user_id)}) or {}
-                monitor_ls_data = user_ls_data.setdefault(website['index'], {})
-                monitor_ls_data['last_status'] = status
-                await ls_collection.replace_one({'_id': str(user_id)}, user_ls_data, upsert=True)
+                await ls_collection.update_one({"_id": user_id}, {"$set": {website["index"]+".last_status": status}})
 
-                # Check if the status of the website has changed
+                # Check if the status has changed and send alerts
                 if status != last_status and last_status is not None:
-                # Check if alerts are turned on for this website
-                    user_alerts = await alerts_collection.find_one({'_id': str(user_id)}) or {}
+                    user_alerts = await alerts_collection.find_one({"_id": user_id})
                     alerts_on = user_alerts.get(website['index'], True)
                     if alerts_on:
                         user = client.get_user(int(user_id))
@@ -122,34 +101,31 @@ async def ping_website(url, method, time_interval, ping_count, user_id, website)
                             embed = discord.Embed(title='WEBSITE DOWN', description=f'Website {website["index"]} is down.', color=0xff0000)
                             embed.set_footer(text='Website down reminder || SiteLook alert system')
                             await user.send(embed=embed)
-                            error_count += 1
+                        error_count += 1
                     last_status = status
 
-                # Store information about the monitor status change in the history.json file
-                user_history = await history_collection.find_one({'_id': str(user_id)}) or {}
-                monitor_history = user_history.get(website['index'], [])
-                monitor_history.append({'time': date_time, 'status': status})
-                if len(monitor_history) > 15:
-                    monitor_history.pop(0)
-                user_history[website['index']] = monitor_history
-                await history_collection.replace_one({'_id': str(user_id)}, user_history, upsert=True)
+                # Store information about the monitor status change in history.json (replace with MongoDB)
+                async with client.session.begin() as session:
+                    user_history = await history_collection.find_one({"_id": user_id})
+                    monitor_history = user_history.get(website['index'], [])
+                    monitor_history.append({'time': date_time, 'status': status})
+                    if len(monitor_history) > 15:
+                        monitor_history.pop(0)
+                    user_history[website['index']] = monitor_history
+                    await history_collection.replace_one({"_id": user_id}, user_history)
 
-                # Store the last ping time and response status in the websites.json file
-                await websites_collection.update_many(
-                    {'url': url},
-                    {'$set': {
-                        'last_ping_time': date_time,
-                        'response_status': f'{response.status} {response.reason}'
-                    }}
-                )
+                # Store the last ping time and response status in websites.json (replace with MongoDB)
+                async with client.session.begin() as session:
+                    website_data = await websites_collection.find_one({"_id": user_id})
+                    for website in website_data.get(str(user_id), []):
+                        if website['url'] == url:
+                            website['last_ping_time'] = date_time
+                            website['response_status'] = f'{response.status} {response.reason}'
+                            await websites_collection.replace_one({"_id": user_id}, website_data)
+                            break
 
-                # Save the error_count and ping_count values to the an_data.json file
-                user_an_data = await an_data_collection.find_one({'_id': str(user_id)}) or {}
-                monitor_an_data = user_an_data.get(website['index'], {})
-                monitor_an_data['error_count'] = error_count
-                monitor_an_data['ping_count'] = ping_count
-                user_an_data[website['index']] = monitor_an_data
-                await an_data_collection.replace_one({'_id': str(user_id)}, user_an_data, upsert=True)
+                # Update the error_count and ping_count values in MongoDB
+                await an_data_collection.update_one({"_id": user_id}, {"$set": {website["index"]+".error_count": error_count, website["index"]+".ping_count": ping_count}})
 
             except Exception as e:
                 print(f'Error pinging {url}: {e}')
@@ -157,65 +133,58 @@ async def ping_website(url, method, time_interval, ping_count, user_id, website)
             # Wait for the time interval before pinging again
             await asyncio.sleep(time_interval)
 
-
 async def send_requests():
     ping_count = {}
-
-    # Create a dictionary to store the tasks for each website
     tasks = {}
 
     while True:
+        # Get all websites from MongoDB
+        async with client.session.begin() as session:
+            websites = await websites_collection.find().to_list(length=None)
 
-        # Check if there are any new websites added or removed from the file
-        websites_cursor = websites_collection.find({})
-        websites = await websites_cursor.to_list(length=None)
+        # Loop through websites for each user
+        for user_id in set(website["_id"] for website in websites):
+            user_websites = [website for website in websites if website["_id"] == user_id]
 
-        # Loop through the websites for each user
-        for website in websites:
-            user_id = website['user_id']
-            user_websites = website.get('websites', [])  # Use .get() to avoid KeyError
+            # Get user's schedules from MongoDB
+            user_schedules = await schedules_collection.find_one({"_id": user_id})
 
-            # Loop through each website for the current user
-            for user_website in user_websites:
-                url = user_website['url']
-                method = user_website['method']
-                time_interval = user_website['time_interval']
+            for website in user_websites:
+                url = website['url']
+                method = website['method']
+                time_interval = website['time_interval']
 
-            # Check if the monitor is scheduled to run
-            user_schedule_document = await schedules_collection.find_one({'user_id': user_id})
-            if user_schedule_document is not None:
-                user_schedules = user_schedule_document.get('schedules', {})
-                schedule = user_schedules.get(website.get('index', None))
-                if schedule:
-                    now = datetime.now(timezone('Asia/Kolkata'))
-                    iter = croniter(schedule, now)
-                    next_run = iter.get_next(datetime)
-                    if now < next_run:
-                        continue
+                # Check if the monitor is scheduled to run
+                if user_schedules:
+                    schedule = user_schedules.get(website.get('index', None))
+                    if schedule:
+                        now = datetime.now(timezone('Asia/Kolkata'))
+                        iter = croniter(schedule, now)
+                        next_run = iter.get_next(datetime)
+                        if now < next_run:
+                            continue
 
-                    # If the website is stopped, cancel its task if it exists
-                    if 'stopped' in website and website['stopped']:
-                        if url in tasks:
-                            tasks[url].cancel()
-                            del tasks[url]
-                        continue
-
-                    # If the url is not in the tasks dictionary, create a new task for it
-                    if url not in tasks:
-                        tasks[url] = asyncio.create_task(ping_website(url, method, time_interval, ping_count, user_id, website))
-
-                    # If the url is in the tasks dictionary, but the time interval has changed, cancel the old task and create a new one
-                    elif tasks[url].time_interval != time_interval:
+                # Check if website is stopped, cancel existing task
+                if 'stopped' in website and website['stopped']:
+                    if url in tasks:
                         tasks[url].cancel()
-                        tasks[url] = asyncio.create_task(ping_website(url, method, time_interval, ping_count, user_id, website))
+                        del tasks[url]
+                    continue
 
-            # Loop through the tasks dictionary and cancel any task that is not in the file anymore
-            for url, task in list(tasks.items()):
-                if not any(url == website['url'] for user_websites in websites.values() for website in user_websites):
-                    task.cancel()
-                    del tasks[url]
+                # Create or update task for the website
+                if url not in tasks or tasks[url].time_interval != time_interval:
+                    if url in tasks:
+                        tasks[url].cancel()
+                    tasks[url] = asyncio.create_task(ping_website(url, method, time_interval, ping_count, user_id, website))
 
-        # Wait for 5 seconds before checking the file again
+        # Remove tasks for websites not found in MongoDB
+        for url, task in list(tasks.items()):
+            website_exists = await websites_collection.find_one({"url": url})
+            if not website_exists:
+                task.cancel()
+                del tasks[url]
+
+        # Wait before checking again
         await asyncio.sleep(5)
 
 
@@ -341,9 +310,9 @@ async def start(ctx, index: int = None):
         embed.set_footer(text='up!start')
         await ctx.send(embed=embed)
         return
-    user_websites_document = await websites_collection.find_one({'user_id': str(ctx.author.id)})
-    if user_websites_document:
-        user_websites = user_websites_document.get('websites', [])
+    with open('websites.json', 'r') as f:
+        websites = json.load(f)
+    user_websites = websites.get(str(ctx.author.id), [])
     if not user_websites:
         embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
         embed.set_footer(text='up!start')
@@ -357,12 +326,9 @@ async def start(ctx, index: int = None):
     website = user_websites[index - 1]
     if 'stopped' in website and website['stopped']:
         website['stopped'] = False
-        user_websites = websites[str(ctx.author.id)]
-        # Update the document in MongoDB using Motor
-        await websites_collection.update_one(
-            {'_id': ctx.author.id},  # Assuming '_id' is used as the key for user ID
-            {'$set': {'websites': user_websites}}
-        )
+        websites[str(ctx.author.id)] = user_websites
+        with open('websites.json', 'w') as f:
+            json.dump(websites, f)
         embed = discord.Embed(title='Success', description=f'Website {index} started', color=0x00ff00)
         embed.set_footer(text='up!start')
         await ctx.send(embed=embed)
@@ -378,9 +344,9 @@ async def stop(ctx, index: int = None):
         embed.set_footer(text='up!stop')
         await ctx.send(embed=embed)
         return
-    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
-    if user_websites is None:
-        user_websites = []
+    with open('websites.json', 'r') as f:
+        websites = json.load(f)
+    user_websites = websites.get(str(ctx.author.id), [])
     if not user_websites:
         embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
         embed.set_footer(text='up!stop')
@@ -394,12 +360,9 @@ async def stop(ctx, index: int = None):
     website = user_websites[index - 1]
     if 'stopped' not in website or not website['stopped']:
         website['stopped'] = True
-        user_websites = await websites_collection.find_one({'_id': ctx.author.id})
-        if user_websites:
-            await websites_collection.update_one(
-                {'_id': ctx.author.id},
-                {'$set': {'stopped': True}}
-            )
+        websites[str(ctx.author.id)] = user_websites
+        with open('websites.json', 'w') as f:
+            json.dump(websites, f)
         embed = discord.Embed(title='Success', description=f'Website {index} stopped', color=0x00ff00)
         embed.set_footer(text='up!stop')
         await ctx.send(embed=embed)
@@ -412,7 +375,9 @@ async def stop(ctx, index: int = None):
 @client.command()
 async def alert(ctx):
     # Check if the user has any websites to monitor
-    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
+    with open('websites.json', 'r') as f:
+        websites = json.load(f)
+    user_websites = websites.get(str(ctx.author.id), [])
     if not user_websites:
         embed = discord.Embed(title='Error', description='You do not have any websites to monitor.', color=0xff0000)
         embed.set_footer(text='up!alert')
@@ -441,9 +406,9 @@ async def alert(ctx):
     website = user_websites[website_index]
 
     # Check if alerts are already on or off for this website
-    user_alerts = await alerts_collection.find_one({'_id': ctx.author.id})
-    if not user_alerts:
-        user_alerts = {}
+    with open('alerts.json', 'r') as f:
+        alerts = json.load(f)
+    user_alerts = alerts.get(str(ctx.author.id), {})
     alerts_on = user_alerts.get(website['index'], True)
 
     # Prompt the user to turn alerts on or off
@@ -469,10 +434,9 @@ async def alert(ctx):
 
     # Update the alerts.json file with the new alert setting
     user_alerts[website['index']] = response.content == 'on'
-    await alerts_collection.update_one(
-        {'_id': ctx.author.id},
-        {'$set': {website['index']: user_alerts[website['index']]}}
-    )
+    alerts[str(ctx.author.id)] = user_alerts
+    with open('alerts.json', 'w') as f:
+        json.dump(alerts, f)
 
     # Send a success message
     embed = discord.Embed(title='Success', description=f'Alerts turned {response.content} for website {website["index"]}', color=0x00ff00)
@@ -514,15 +478,13 @@ async def schedule(ctx, index=None, *, schedule=None):
         schedule = response.content
 
     # Update the schedules.json file with the new schedule
-    user_schedules = await schedules_collection.find_one({'_id': ctx.author.id})
-    if not user_schedules:
-        user_schedules = {}
+    with open('schedules.json', 'r') as f:
+        schedules = json.load(f)
+    user_schedules = schedules.get(str(ctx.author.id), {})
     user_schedules[index] = schedule
-    await schedules_collection.update_one(
-        {'_id': ctx.author.id},
-        {'$set': {str(index): schedule}},
-        upsert=True
-    )
+    schedules[str(ctx.author.id)] = user_schedules
+    with open('schedules.json', 'w') as f:
+        json.dump(schedules, f)
 
     # Send a success message
     await ctx.send(f'Schedule set for monitor {index}')
@@ -546,10 +508,10 @@ async def history(ctx, index=None):
         index = response.content
 
     # Load the history.json file and get the history for the specified monitor
-    user_history = await history_collection.find_one({'_id': ctx.author.id})
-    if not user_history:
-        user_history = {}
-    monitor_history = user_history.get(str(index), [])
+    with open('history.json', 'r') as f:
+        history = json.load(f)
+    user_history = history.get(str(ctx.author.id), {})
+    monitor_history = user_history.get(index, [])
     if not monitor_history:
         embed = discord.Embed(title='History', description=f'No history found for monitor {index}', color=0x00ff00)
         embed.set_footer(text='up!history')
@@ -583,10 +545,10 @@ async def analytics(ctx, index=None):
         index = response.content
 
     # Load the analytics.json file and get the analytics for the specified monitor
-    user_analytics = await analytics_collection.find_one({'_id': ctx.author.id})
-    if not user_analytics:
-        user_analytics = {}
-    monitor_analytics = user_analytics.get(str(index), {})
+    with open('analytics.json', 'r') as f:
+        analytics = json.load(f)
+    user_analytics = analytics.get(str(ctx.author.id), {})
+    monitor_analytics = user_analytics.get(index, {})
     if not monitor_analytics:
         embed = discord.Embed(title='Analytics', description=f'No analytics found for monitor {index}', color=0x00ff00)
         embed.set_footer(text='up!analytics')
@@ -612,14 +574,15 @@ async def monitor(ctx):
         await ctx.send(embed=embed)
         return
     website = split_message[1]
-    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
-    if user_websites:
-        for user_website in user_websites:
-            if user_website['url'] == website:
-                embed = discord.Embed(title='Error', description='That website is already being monitored', color=0xff0000)
-                embed.set_footer(text='up!monitor')
-                await ctx.send(embed=embed)
-                return
+    with open('websites.json', 'r') as f:
+        websites = json.load(f)
+    user_websites = websites.get(str(ctx.author.id), [])
+    for user_website in user_websites:
+        if user_website['url'] == website:
+            embed = discord.Embed(title='Error', description='That website is already being monitored', color=0xff0000)
+            embed.set_footer(text='up!monitor')
+            await ctx.send(embed=embed)
+            return
     embed = discord.Embed(title='Method', description='''Which one? 
 1. HEAD
 2. GET
@@ -686,17 +649,12 @@ The minimum interval is 1 minute.''', color=0x00ff00)
         return
 
     # Generate a new index for the website by finding the maximum index of existing websites and adding 1
-    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
-    if not user_websites:
-        user_websites = {'websites': []}
-    max_index = max((int(website['index']) for website in user_websites['websites']), default=0)
+    max_index = max((int(user_website['index']) for user_website in user_websites), default=0)
     new_index = str(max_index + 1)
-    new_website = {'url': website, 'method': method, 'time_interval': seconds, 'index': new_index}
-    await websites_collection.update_one(
-        {'_id': ctx.author.id},
-        {'$push': {'websites': new_website}},
-        upsert=True
-    )
+    user_websites.append({'url': website, 'method': method, 'time_interval': seconds, 'index': new_index})
+    websites[str(ctx.author.id)] = user_websites
+    with open('websites.json', 'w') as f:
+        json.dump(websites, f)
 
     # Delete the user's messages if possible
     try:
@@ -720,9 +678,9 @@ async def remove(ctx):
         await ctx.send(embed=embed)
         return
     argument = split_message[1]
-    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
-    if not user_websites:
-        user_websites = []
+    with open('websites.json', 'r') as f:
+        websites = json.load(f)
+    user_websites = websites.get(str(ctx.author.id), [])
 
     # Check if the argument is an index
     if argument.isdigit():
@@ -755,7 +713,9 @@ async def remove(ctx):
 
 @client.command()
 async def stats(ctx):
-    user_websites = await websites_collection.find_one({'_id': ctx.author.id})
+    with open('websites.json', 'r') as f:
+        websites = json.load(f)
+    user_websites = websites.get(str(ctx.author.id), [])
     if not user_websites:
         embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
         embed.set_footer(text='up!stats')
@@ -776,11 +736,19 @@ async def stats(ctx):
     if not isinstance(ctx.channel, discord.channel.DMChannel):
         await ctx.send(f'{ctx.author.mention} Check your DMs!')
 
-@client.command(name='servercount')
-@commands.is_owner()
-async def servercount(ctx):
-    
-    await ctx.send(f'The bot is currently in {len(client.guilds)} servers.')
+@client.command(name='botstats')
+# @commands.is_owner()
+async def botstats(ctx):
+    if ctx.author.id not in [920850442425102367, 1139406664584409159]:
+        return
+        
+    # Create the embed
+    embed = discord.Embed(title='Bot Stats', color=0x00ff00)
+    embed.add_field(name='Servers', value=f'{len(client.guilds)}', inline=True)
+    embed.add_field(name='Total Members', value=f'{len(client.users)}', inline=True)
+    embed.set_footer(text='Server count and total member count')
 
+    # Send the embed
+    await ctx.send(embed=embed)
 
 client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GuqaiK.fpbVPiALpa4amONNuZj6T_Ax-T2wAz-K75UPF8")
