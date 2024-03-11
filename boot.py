@@ -755,7 +755,7 @@ async def stats(ctx):
     if not isinstance(ctx.channel, discord.channel.DMChannel):
         await ctx.send(f'{ctx.author.mention} Check your DMs!')
 
-@client.command(name='botstats')
+@client.command(name='servercount')
 # @commands.is_owner()
 async def botstats(ctx):
     if ctx.author.id not in [1920850442425102367, 1139406664584409159]:
