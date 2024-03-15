@@ -63,6 +63,7 @@ async def ping_website(url, method, time_interval, ping_count, user_id, website)
                 response_time = round((time.time() - start_time) * 1000)
                 now = datetime.now(timezone('Asia/Kolkata'))
                 date_time = now.strftime("%d/%m/%y @ %I:%M %p")
+                ping_count += 1
                 log = f'{url}: {response.status} | Pinged on {date_time} (IST) | Ping count: {ping_count} | Response time: {response_time}ms'
                 print(log)
 
@@ -187,8 +188,6 @@ async def send_requests():
         # Wait before checking again
         await asyncio.sleep(5)
 
-
-
 client.remove_command('help')
 
 @client.command()
@@ -297,7 +296,6 @@ async def help(ctx, command=None):
             embed.set_footer(text='up!help')
             await ctx.send(embed=embed)
 
-
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user}')
@@ -310,25 +308,30 @@ async def start(ctx, index: int = None):
         embed.set_footer(text='up!start')
         await ctx.send(embed=embed)
         return
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
-    if not user_websites:
-        embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
+
+    # Get user's websites from MongoDB
+    async with client.session.begin() as session:
+        user_websites = await websites_collection.find_one({"_id": ctx.author.id})
+        if not user_websites:
+            embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
+            embed.set_footer(text='up!start')
+            await ctx.send(embed=embed)
+            return
+
+    # Validate website index
+    if index < 1 or index > len(user_websites.get("websites", [])):
+        embed = discord.Embed(title='Error', description=f'Invalid index. Please enter a number between 1 and {len(user_websites.get("websites", []))}\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
         embed.set_footer(text='up!start')
         await ctx.send(embed=embed)
         return
-    if index < 1 or index > len(user_websites):
-        embed = discord.Embed(title='Error', description=f'Invalid index. Please enter a number between 1 and {len(user_websites)}\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
-        embed.set_footer(text='up!start')
-        await ctx.send(embed=embed)
-        return
-    website = user_websites[index - 1]
+
+    website_index = index - 1
+    website = user_websites["websites"][website_index]
+
+    # Update website status in MongoDB
     if 'stopped' in website and website['stopped']:
         website['stopped'] = False
-        websites[str(ctx.author.id)] = user_websites
-        with open('websites.json', 'w') as f:
-            json.dump(websites, f)
+        await websites_collection.update_one({"_id": ctx.author.id}, {"$set": {"websites."+str(website_index): website}})
         embed = discord.Embed(title='Success', description=f'Website {index} started', color=0x00ff00)
         embed.set_footer(text='up!start')
         await ctx.send(embed=embed)
@@ -344,25 +347,30 @@ async def stop(ctx, index: int = None):
         embed.set_footer(text='up!stop')
         await ctx.send(embed=embed)
         return
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
-    if not user_websites:
-        embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
+
+    # Get user's websites from MongoDB
+    async with client.session.begin() as session:
+        user_websites = await websites_collection.find_one({"_id": ctx.author.id})
+        if not user_websites:
+            embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
+            embed.set_footer(text='up!stop')
+            await ctx.send(embed=embed)
+            return
+
+    # Validate website index
+    if index < 1 or index > len(user_websites.get("websites", [])):
+        embed = discord.Embed(title='Error', description=f'Invalid index. Please enter a number between 1 and {len(user_websites.get("websites", []))}\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
         embed.set_footer(text='up!stop')
         await ctx.send(embed=embed)
         return
-    if index < 1 or index > len(user_websites):
-        embed = discord.Embed(title='Error', description=f'Invalid index. Please enter a number between 1 and {len(user_websites)}\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
-        embed.set_footer(text='up!stop')
-        await ctx.send(embed=embed)
-        return
-    website = user_websites[index - 1]
+
+    website_index = index - 1
+    website = user_websites["websites"][website_index]
+
+    # Update website status in MongoDB
     if 'stopped' not in website or not website['stopped']:
         website['stopped'] = True
-        websites[str(ctx.author.id)] = user_websites
-        with open('websites.json', 'w') as f:
-            json.dump(websites, f)
+        await websites_collection.update_one({"_id": ctx.author.id}, {"$set": {"websites."+str(website_index): website}})
         embed = discord.Embed(title='Success', description=f'Website {index} stopped', color=0x00ff00)
         embed.set_footer(text='up!stop')
         await ctx.send(embed=embed)
@@ -371,25 +379,25 @@ async def stop(ctx, index: int = None):
         embed.set_footer(text='up!stop')
         await ctx.send(embed=embed)
 
-
 @client.command()
 async def alert(ctx):
     # Check if the user has any websites to monitor
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
-    if not user_websites:
-        embed = discord.Embed(title='Error', description='You do not have any websites to monitor.', color=0xff0000)
-        embed.set_footer(text='up!alert')
-        await ctx.send(embed=embed)
-        return
+    async with client.session.begin() as session:
+        user_websites = await websites_collection.find_one({"_id": ctx.author.id})
+        if not user_websites:
+            embed = discord.Embed(title='Error', description='You do not have any websites to monitor.', color=0xff0000)
+            embed.set_footer(text='up!alert')
+            await ctx.send(embed=embed)
+            return
 
     # Prompt the user to choose a website
     embed = discord.Embed(title='Website', description='Which website do you want to set an alert for? Reply with your website index. If you don\'t know the index, please use up!stats.', color=0x00ff00)
     embed.set_footer(text='up!alert')
     await ctx.send(embed=embed)
+
     def check(m):
         return m.author == ctx.author and m.channel == ctx.channel and m.content.isdigit()
+
     try:
         response = await client.wait_for('message', check=check, timeout=30.0)
     except asyncio.TimeoutError:
@@ -398,25 +406,28 @@ async def alert(ctx):
         await ctx.send(embed=embed)
         return
     website_index = int(response.content) - 1
-    if not (0 <= website_index < len(user_websites)):
+
+    # Validate website index
+    if not (0 <= website_index < len(user_websites.get("websites", []))):
         embed = discord.Embed(title='Error', description=f'Please enter a valid website index.', color=0xff0000)
         embed.set_footer(text='up!alert')
         await ctx.send(embed=embed)
         return
-    website = user_websites[website_index]
 
-    # Check if alerts are already on or off for this website
-    with open('alerts.json', 'r') as f:
-        alerts = json.load(f)
-    user_alerts = alerts.get(str(ctx.author.id), {})
-    alerts_on = user_alerts.get(website['index'], True)
+    website = user_websites["websites"][website_index]
+
+    # Check user's alerts document in MongoDB
+    user_alerts = await alerts_collection.find_one({"_id": ctx.author.id})
+    alerts_on = user_alerts.get(str(website_index), True) if user_alerts else True
 
     # Prompt the user to turn alerts on or off
     embed = discord.Embed(title='Alerts', description=f'Do you want to turn alerts on or off for this website?', color=0x00ff00)
     embed.set_footer(text='up!alert')
     await ctx.send(embed=embed)
+
     def check(m):
         return m.author == ctx.author and m.channel == ctx.channel and m.content in ['on', 'off']
+
     try:
         response = await client.wait_for('message', check=check, timeout=30.0)
     except asyncio.TimeoutError:
@@ -425,27 +436,26 @@ async def alert(ctx):
         await ctx.send(embed=embed)
         return
 
-    # Check if the user is trying to turn on or off alerts for a website that already has alerts turned on or off, respectively
+    # Check if user is trying to turn alerts on/off for a website with matching state
     if (response.content == 'on' and alerts_on) or (response.content == 'off' and not alerts_on):
         embed = discord.Embed(title='Error', description=f'Website {website["index"]} already has its alerts turned {"on" if alerts_on else "off"}.', color=0xff0000)
         embed.set_footer(text='up!alert')
         await ctx.send(embed=embed)
         return
 
-    # Update the alerts.json file with the new alert setting
-    user_alerts[website['index']] = response.content == 'on'
-    alerts[str(ctx.author.id)] = user_alerts
-    with open('alerts.json', 'w') as f:
-        json.dump(alerts, f)
+    # Update alerts in MongoDB for the specific website
+    if not user_alerts:
+        user_alerts = {"_id": ctx.author.id}
+    user_alerts[str(website_index)] = response.content == 'on'
+    await alerts_collection.update_one({"_id": ctx.author.id}, {"$set": user_alerts}, upsert=True)
 
     # Send a success message
     embed = discord.Embed(title='Success', description=f'Alerts turned {response.content} for website {website["index"]}', color=0x00ff00)
-    embed.set_footer(text='up!alert')
-    await ctx.send(embed=embed)
+    embed
 
 @client.command()
 async def schedule(ctx, index=None, *, schedule=None):
-    # If the index argument is not provided, prompt the user for it
+    # Prompt for index if not provided
     if index is None:
         embed = discord.Embed(title='Index', description='Which monitor do you want to set a schedule for? Please enter the index of the monitor.', color=0x00ff00)
         embed.set_footer(text='up!schedule')
@@ -459,9 +469,9 @@ async def schedule(ctx, index=None, *, schedule=None):
             embed.set_footer(text='up!schedule')
             await ctx.send(embed=embed)
             return
-        index = response.content
+        index = int(response.content)
 
-    # If the schedule argument is not provided, prompt the user for it
+    # Prompt for schedule if not provided
     if schedule is None:
         embed = discord.Embed(title='Schedule', description='What schedule do you want to set for the monitor? Please enter a cron expression.', color=0x00ff00)
         embed.set_footer(text='up!schedule')
@@ -477,21 +487,21 @@ async def schedule(ctx, index=None, *, schedule=None):
             return
         schedule = response.content
 
-    # Update the schedules.json file with the new schedule
-    with open('schedules.json', 'r') as f:
-        schedules = json.load(f)
-    user_schedules = schedules.get(str(ctx.author.id), {})
-    user_schedules[index] = schedule
-    schedules[str(ctx.author.id)] = user_schedules
-    with open('schedules.json', 'w') as f:
-        json.dump(schedules, f)
+    # Update user's schedule in MongoDB
+    async with client.session.begin() as session:
+        user_schedules = await schedules_collection.find_one({"_id": ctx.author.id})
+        if not user_schedules:
+            user_schedules = {"_id": ctx.author.id}
+        user_schedules["websites"] = user_schedules.get("websites", [])  # Ensure websites key exists
+        user_schedules["websites"][index - 1] = schedule
+        await schedules_collection.update_one({"_id": ctx.author.id}, {"$set": user_schedules}, upsert=True)
 
     # Send a success message
     await ctx.send(f'Schedule set for monitor {index}')
 
 @client.command()
 async def history(ctx, index=None):
-    # If the index argument is not provided, prompt the user for it
+    # Prompt for index if not provided
     if index is None:
         embed = discord.Embed(title='Index', description='Which monitor do you want to view the history for? Please enter the index of the monitor.', color=0x00ff00)
         embed.set_footer(text='up!history')
@@ -505,13 +515,19 @@ async def history(ctx, index=None):
             embed.set_footer(text='up!history')
             await ctx.send(embed=embed)
             return
-        index = response.content
+        index = int(response.content)
 
-    # Load the history.json file and get the history for the specified monitor
-    with open('history.json', 'r') as f:
-        history = json.load(f)
-    user_history = history.get(str(ctx.author.id), {})
-    monitor_history = user_history.get(index, [])
+    # Get user's history from MongoDB
+    async with client.session.begin() as session:
+        user_history = await history_collection.find_one({"_id": ctx.author.id})
+        if not user_history:
+            embed = discord.Embed(title='History', description=f'No history found for monitor {index}', color=0x00ff00)
+            embed.set_footer(text='up!history')
+            await ctx.send(embed=embed)
+            return
+        monitor_history = user_history.get("websites", {}).get(str(index - 1), [])
+
+    # Check if history exists for the website
     if not monitor_history:
         embed = discord.Embed(title='History', description=f'No history found for monitor {index}', color=0x00ff00)
         embed.set_footer(text='up!history')
@@ -528,7 +544,7 @@ async def history(ctx, index=None):
 
 @client.command()
 async def analytics(ctx, index=None):
-    # If the index argument is not provided, prompt the user for it
+    # Prompt for index if not provided
     if index is None:
         embed = discord.Embed(title='Index', description='Which monitor do you want to view the analytics for? Please enter the index of the monitor.', color=0x00ff00)
         embed.set_footer(text='up!analytics')
@@ -542,13 +558,19 @@ async def analytics(ctx, index=None):
             embed.set_footer(text='up!analytics')
             await ctx.send(embed=embed)
             return
-        index = response.content
+        index = int(response.content)
 
-    # Load the analytics.json file and get the analytics for the specified monitor
-    with open('analytics.json', 'r') as f:
-        analytics = json.load(f)
-    user_analytics = analytics.get(str(ctx.author.id), {})
-    monitor_analytics = user_analytics.get(index, {})
+    # Get user's analytics from MongoDB
+    async with client.session.begin() as session:
+        user_analytics = await analytics_collection.find_one({"_id": ctx.author.id})
+        if not user_analytics:
+            embed = discord.Embed(title='Analytics', description=f'No analytics found for monitor {index}', color=0x00ff00)
+            embed.set_footer(text='up!analytics')
+            await ctx.send(embed=embed)
+            return
+        monitor_analytics = user_analytics.get("websites", {}).get(str(index - 1), {})
+
+    # Check if analytics exists for the website
     if not monitor_analytics:
         embed = discord.Embed(title='Analytics', description=f'No analytics found for monitor {index}', color=0x00ff00)
         embed.set_footer(text='up!analytics')
@@ -564,7 +586,6 @@ async def analytics(ctx, index=None):
     embed.set_footer(text='up!analytics')
     await ctx.send(embed=embed)
 
-
 @client.command()
 async def monitor(ctx):
     split_message = ctx.message.content.split()
@@ -574,15 +595,17 @@ async def monitor(ctx):
         await ctx.send(embed=embed)
         return
     website = split_message[1]
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
-    for user_website in user_websites:
-        if user_website['url'] == website:
+
+    # Check if website is already being monitored
+    async with client.session.begin() as session:
+        user_websites = await websites_collection.find_one({"_id": ctx.author.id})
+        if user_websites and any(website_data['url'] == website for website_data in user_websites.get("websites", [])):
             embed = discord.Embed(title='Error', description='That website is already being monitored', color=0xff0000)
             embed.set_footer(text='up!monitor')
             await ctx.send(embed=embed)
             return
+
+    # Prompt for method
     embed = discord.Embed(title='Method', description='''Which one? 
 1. HEAD
 2. GET
@@ -590,6 +613,7 @@ async def monitor(ctx):
 Reply with the 1, 2 or 3.''', color=0x00ff00)
     embed.set_footer(text='up!monitor')
     await ctx.send(embed=embed)
+
     def check(m):
         return m.author == ctx.author and m.channel == ctx.channel and m.content in ['1', '2', '3']
     try:
@@ -607,7 +631,7 @@ Reply with the 1, 2 or 3.''', color=0x00ff00)
     elif response.content == '3':
         method = 'POST'
 
-    # Ask the user for the time interval
+    # Ask for time interval
     embed = discord.Embed(title='Time Interval', description='''How often do you want to ping the website? 
 Enter a number followed by a unit of time. For example: 
 s for seconds
@@ -622,7 +646,6 @@ The minimum interval is 1 minute.''', color=0x00ff00)
     embed.set_footer(text='up!monitor')
     await ctx.send(embed=embed)
 
-    # Use a regular expression to check the format of the time interval
     def check(m):
         return m.author == ctx.author and m.channel == ctx.channel and re.match(r'\d+(\.\d+)?[smhdw]$', m.content)
     try:
@@ -633,7 +656,7 @@ The minimum interval is 1 minute.''', color=0x00ff00)
         await ctx.send(embed=embed)
         return
 
-    # Convert the time interval to seconds and store it in the websites.json file
+    # Convert time interval to seconds
     time_interval = response.content
     unit = time_interval[-1]
     factor = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 604800}
@@ -648,13 +671,25 @@ The minimum interval is 1 minute.''', color=0x00ff00)
         await ctx.send(embed=embed)
         return
 
-    # Generate a new index for the website by finding the maximum index of existing websites and adding 1
-    max_index = max((int(user_website['index']) for user_website in user_websites), default=0)
-    new_index = str(max_index + 1)
-    user_websites.append({'url': website, 'method': method, 'time_interval': seconds, 'index': new_index})
-    websites[str(ctx.author.id)] = user_websites
-    with open('websites.json', 'w') as f:
-        json.dump(websites, f)
+    # Generate a new website ID
+    async with client.session.begin() as session:
+        # Find the maximum website ID for the user
+        user_websites = await websites_collection.find_one({"_id": ctx.author.id})
+        max_website_id = 0
+        if user_websites:
+            max_website_id = max(website_data['_id'] for website_data in user_websites.get("websites", []))
+
+    new_website_id = max_website_id + 1
+
+    # Add website data to user's websites in MongoDB
+    website_data = {
+        "_id": new_website_id,
+        "url": website,
+        "method": method,
+        "time_interval": seconds,
+    }
+    async with client.session.begin() as session:
+        user_websites = await websites_collection.find_one_and_update({"_id": ctx.author.id}, {"$push": {"websites": website_data}}, upsert=True)
 
     # Delete the user's messages if possible
     try:
@@ -678,24 +713,22 @@ async def remove(ctx):
         await ctx.send(embed=embed)
         return
     argument = split_message[1]
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
 
     # Check if the argument is an index
     if argument.isdigit():
-        index = int(argument)
-        if index < 1 or index > len(user_websites):
-            embed = discord.Embed(title='Error', description=f'Invalid index. Please enter a number between 1 and {len(user_websites)}\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
-            embed.set_footer(text='up!remove')
-            await ctx.send(embed=embed)
-            return
-        del user_websites[index - 1]
+        index = int(argument) - 1
 
-        # Update the file and send a success message
-        websites[str(ctx.author.id)] = user_websites
-        with open('websites.json', 'w') as f:
-            json.dump(websites, f)
+        # Remove website from user's websites in MongoDB
+        async with client.session.begin() as session:
+            user_websites = await websites_collection.find_one_and_update({"_id": ctx.author.id}, {"$pull": {"websites": {"_id": index}}}, upsert=False)
+            if not user_websites:
+                # Existing error message preserved here
+                embed = discord.Embed(title='Error', description=f'Invalid index. Please enter a number between 1 and {len(user_websites)}\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
+                embed.set_footer(text='up!remove')
+                await ctx.send(embed=embed)
+                return
+
+        # Delete successful, send confirmation message
         if not isinstance(ctx.channel, discord.channel.DMChannel):
             try:
                 await ctx.message.delete()
@@ -705,7 +738,7 @@ async def remove(ctx):
         embed.set_footer(text='up!remove')
         await ctx.send(embed=embed)
 
-    # If the argument is not an index, send an error message
+    # Invalid argument, send error message
     else:
         embed = discord.Embed(title='Error', description=f'Invalid argument. Please enter an index to remove. Example: up!remove 1\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
         embed.set_footer(text='up!remove')
@@ -713,23 +746,26 @@ async def remove(ctx):
 
 @client.command()
 async def stats(ctx):
-    with open('websites.json', 'r') as f:
-        websites = json.load(f)
-    user_websites = websites.get(str(ctx.author.id), [])
-    if not user_websites:
+    # Find user's websites in MongoDB
+    async with client.session.begin() as session:
+        user_websites = await websites_collection.find_one({"_id": ctx.author.id})
+
+    if not user_websites or not user_websites.get("websites", []):
         embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
         embed.set_footer(text='up!stats')
         await ctx.send(embed=embed)
         return
+
     stats_message = ''
     count = 1
-    for website in user_websites:
-        url = website['url']
-        method = website['method']
-        last_ping_time = website.get('last_ping_time', 'N/A')
-        response_status = website.get('response_status', 'N/A')
+    for website_data in user_websites["websites"]:
+        url = website_data["url"]
+        method = website_data["method"]
+        last_ping_time = website_data.get('last_ping_time', 'N/A')
+        response_status = website_data.get('response_status', 'N/A')
         stats_message += f'{count}. {url}, {method}, last pinged on {last_ping_time} (IST), response status: {response_status}\n'
         count += 1
+
     embed = discord.Embed(title='Stats', description=stats_message, color=0x00ff00)
     embed.set_footer(text='up!stats')
     await ctx.author.send(embed=embed)
