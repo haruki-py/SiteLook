@@ -37,7 +37,7 @@ client.activity = discord.Activity(type=discord.ActivityType.watching, name="Web
 # Define a function to ping a website with a given method and time interval
 async def ping_website(url, method, time_interval, ping_count, user_id, website):
     # Retrieve last_status, error_count, and ping_count from MongoDB
-    async with client.session.begin() as session:
+    async with aiohttp.ClientSession() as session:
         user_ls_data = await ls_collection.find_one({"_id": user_id})
         monitor_ls_data = user_ls_data.get(website["index"], {})
         last_status = monitor_ls_data.get("last_status", None)
@@ -140,7 +140,7 @@ async def send_requests():
 
     while True:
         # Get all websites from MongoDB
-        async with client.session.begin() as session:
+        async with aiohttp.ClientSession() as session:
             websites = await websites_collection.find().to_list(length=None)
 
         # Loop through websites for each user
@@ -151,9 +151,9 @@ async def send_requests():
             user_schedules = await schedules_collection.find_one({"_id": user_id})
 
             for website in user_websites:
-                url = website['url']
-                method = website['method']
-                time_interval = website['time_interval']
+                url = website.get('url', None)
+                method = website.get('method', None)
+                time_interval = website.get('time_interval', None)
 
                 # Check if the monitor is scheduled to run
                 if user_schedules:
