@@ -3,3 +3,10 @@
 /__pycache__
 /nohup.out
 /.cache
+/alerts.json
+/an_data.json
+/analytics.json
+/history.json
+/ls.json
+/schedules.json
+/websites.json
