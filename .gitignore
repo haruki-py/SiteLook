@@ -2,3 +2,4 @@ nohup.out
 uwsgi.ini
 /__pycache__
 /.cache
+websites.json
