@@ -1,4 +1,8 @@
 # from webapp import keep_alive
+import platform
+import psutil
+import sys
+import subprocess
 import time
 import discord
 import json
@@ -12,6 +16,9 @@ from pytz import timezone
 import asyncio
 from discord import Intents
 from discord.ext import commands
+
+ownerid = 920850442425102367
+adminid = [1139406664584409159, 920850442425102367]
 
 intents = discord.Intents.all()
 # intents.message_content = True
@@ -304,7 +311,7 @@ async def help(ctx, command=None):
 
             # Send the help message for the help command
             elif command == 'help':
-                embed = discord.Embed(title='Help: help', description='Get help on how to use this bot or a specific command.', color=0x00ff00)
+                embed = discord.Embed(title='Help: help (VEEBLE 100 MBPS!!!!1!111!)', description='Get help on how to use this bot or a specific command.', color=0x00ff00)
                 embed.add_field(name='Usage', value='up!help [command]', inline=False)
                 embed.add_field(name='Example', value='up!help monitor', inline=False)
                 embed.set_footer(text='up!help help')
@@ -758,7 +765,7 @@ async def stats(ctx):
 @client.command(name='botstats')
 # @commands.is_owner()
 async def botstats(ctx):
-    if ctx.author.id not in [920850442425102367, 1139406664584409159]:
+    if ctx.author.id not in ownerid or adminid:
         return
         
     # Create the embed
@@ -766,6 +773,54 @@ async def botstats(ctx):
     embed.add_field(name='Servers', value=f'{len(client.guilds)}', inline=True)
     embed.add_field(name='Total Members', value=f'{len(client.users)}', inline=True)
     embed.set_footer(text='Server count and total member count')
+
+    # Send the embed
+    await ctx.send(embed=embed)
+
+@client.command(name='systemstats')
+async def systemstats(ctx):
+    if ctx.author.id not in adminid and ctx.author.id != ownerid:
+        await ctx.send("You do not have permission to use this command.")
+        return
+
+    # Gather system information
+    cpu_freq = psutil.cpu_freq()
+    virtual_memory = psutil.virtual_memory()
+    disk_usage = psutil.disk_usage('/')
+    
+    # Get detailed OS information
+    os_info = platform.uname()
+    os_name = platform.system()
+    os_version = platform.release()
+    
+    # Get CPU model name
+    if os_info.system == "Windows":
+        cpu_model = platform.processor()
+    else:
+        cpu_model = subprocess.getoutput("cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d ':' -f 2").strip()
+    
+    # Get GPU details
+    try:
+        gpu_info = subprocess.getoutput("lspci | grep ' VGA ' | cut -d ':' -f 3")
+        if not gpu_info:
+            gpu_info = 'No GPU found or unable to retrieve GPU information'
+    except Exception:
+        gpu_info = 'No GPU found or unable to retrieve GPU information'
+
+    # Create the embed with system stats
+    embed = discord.Embed(title='System Stats', color=0x00ff00)
+    embed.add_field(name='OS', value=os_name, inline=True)
+    embed.add_field(name='OS Version', value=os_version, inline=True)
+    embed.add_field(name='Python Version', value=platform.python_version(), inline=True)
+    embed.add_field(name='CPU Model', value=cpu_model, inline=True)
+    embed.add_field(name='CPU Cores', value=f'{psutil.cpu_count(logical=False)} physical, {psutil.cpu_count(logical=True)} total', inline=True)
+    embed.add_field(name='CPU Clock Speed', value=f'{cpu_freq.current:.2f} MHz', inline=True)
+    embed.add_field(name='CPU Usage', value=f'{psutil.cpu_percent()}%', inline=True)
+    embed.add_field(name='Total RAM', value=f'{virtual_memory.total / (1024 ** 3):.2f} GB', inline=True)
+    embed.add_field(name='Used RAM', value=f'{virtual_memory.used / (1024 ** 3):.2f} GB ({virtual_memory.percent}%)', inline=True)
+    embed.add_field(name='Total Disk Space', value=f'{disk_usage.total / (1024 ** 3):.2f} GB', inline=True)
+    embed.add_field(name='Used Disk Space', value=f'{disk_usage.used / (1024 ** 3):.2f} GB ({disk_usage.percent}%)', inline=True)
+    embed.add_field(name='GPU', value=gpu_info, inline=True)
 
     # Send the embed
     await ctx.send(embed=embed)
