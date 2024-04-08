@@ -1,6 +1,7 @@
 # from webapp import keep_alive
 import platform
 import psutil
+import GPUtil
 import sys
 import subprocess
 import time
@@ -801,11 +802,13 @@ async def systemstats(ctx):
     
     # Get GPU details
     try:
-        gpu_info = subprocess.getoutput("lspci | grep ' VGA ' | cut -d ':' -f 3")
-        if not gpu_info:
+        GPUs = GPUtil.getGPUs()
+        if GPUs:
+            gpu_info = ', '.join([gpu.name for gpu in GPUs])
+        else:
             gpu_info = 'No GPU found or unable to retrieve GPU information'
-    except Exception:
-        gpu_info = 'No GPU found or unable to retrieve GPU information'
+    except Exception as e:
+        gpu_info = f'Error retrieving GPU information: {str(e)}'
 
     # Create the embed with system stats
     embed = discord.Embed(title='System Stats', color=0x00ff00)
