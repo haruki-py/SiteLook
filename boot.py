@@ -312,7 +312,7 @@ async def help(ctx, command=None):
 
             # Send the help message for the help command
             elif command == 'help':
-                embed = discord.Embed(title='Help: help (VEEBLE 100 MBPS!!!!1!111!)', description='Get help on how to use this bot or a specific command.', color=0x00ff00)
+                embed = discord.Embed(title='Help: help', description='Get help on how to use this bot or a specific command.', color=0x00ff00)
                 embed.add_field(name='Usage', value='up!help [command]', inline=False)
                 embed.add_field(name='Example', value='up!help monitor', inline=False)
                 embed.set_footer(text='up!help help')
