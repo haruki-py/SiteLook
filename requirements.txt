@@ -6,3 +6,5 @@ pytz
 requests
 pymongo
 motor
+psutil
+gputil
