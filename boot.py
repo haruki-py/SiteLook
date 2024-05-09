@@ -780,8 +780,7 @@ async def botstats(ctx):
 
 @client.command(name='systemstats')
 async def systemstats(ctx):
-    if ctx.author.id not in adminid and ctx.author.id != ownerid:
-        await ctx.send("You do not have permission to use this command.")
+    if ctx.author.id not in ownerid or adminid:
         return
 
     # Gather system information
@@ -830,7 +829,7 @@ async def systemstats(ctx):
 
 @client.command(name="eval")
 async def evaluate(ctx, *, code: str):
-    if ctx.author.id not in adminid and ctx.author.id != ownerid:
+    if ctx.author.id not in ownerid or adminid:
         return
 
     # Remove single or triple backtick code block formatting
@@ -857,6 +856,63 @@ async def evaluate(ctx, *, code: str):
     except Exception as e:
         # Handle any exceptions
         embed = discord.Embed(title='Error', description=f'An error occurred: {str(e)}', color=0xff0000)
+        await ctx.send(embed=embed)
+
+@client.command()
+async def exec(ctx, *, command: str = None):
+    # Check if a command was provided
+    if command is None:
+        embed = discord.Embed(title='Error', description='Please provide a command to execute. Example: up!exec ls -la', color=0xff0000)
+        embed.set_footer(text='up!exec')
+        await ctx.send(embed=embed)
+        return
+
+    # Remove single backticks and triple backticks with language identifiers
+    command = command.strip('`').strip('```').split('\n', 1)[-1] if command.startswith('```') else command
+
+    # Execute the command in the shell
+    process = await asyncio.create_subprocess_shell(
+        command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+
+    # Function to check if the response is from the user who invoked the command
+    def check(m):
+        return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() == 'stop'
+
+    try:
+        # Wait for the user to possibly send 'stop' to terminate the command
+        stop_message = await client.wait_for('message', check=check, timeout=30.0)  # 30 seconds to reply
+        if stop_message:
+            process.terminate()
+            await ctx.send(embed=discord.Embed(title='Command Stopped', description='The command execution has been stopped.', color=0xff0000).set_footer(text='up!exec'))
+    except asyncio.TimeoutError:
+        pass  # If no 'stop' is sent, just continue
+
+    stdout, stderr = await process.communicate()
+
+    # Check if the output exceeds the Discord character limit for fields in embeds
+    if stdout or stderr:
+        output = stdout.decode() + '\n' + stderr.decode()
+        if len(output) > 1024:  # Discord's limit for fields in embeds is 1024 characters
+            # Write output to a temporary file
+            with open('output.txt', 'w') as file:
+                file.write(output)
+            # Send the file
+            await ctx.send(file=discord.File('output.txt'))
+            # Delete the file
+            os.remove('output.txt')
+        else:
+            # Prepare the response message
+            response = discord.Embed(title='Command Executed', color=0x00ff00)
+            response.add_field(name='Output', value=f'```\n{output}\n```', inline=False)
+            response.set_footer(text='up!exec')
+            await ctx.send(embed=response)
+    else:
+        # Send a message indicating that the command was executed without output
+        embed = discord.Embed(title='Command Executed', description='The command was executed successfully, but there was no output.', color=0x00ff00)
+        embed.set_footer(text='up!exec')
         await ctx.send(embed=embed)
 
 client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GuqaiK.fpbVPiALpa4amONNuZj6T_Ax-T2wAz-K75UPF8")
