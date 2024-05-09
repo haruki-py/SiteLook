@@ -858,7 +858,7 @@ async def evaluate(ctx, *, code: str):
         embed = discord.Embed(title='Error', description=f'An error occurred: {str(e)}', color=0xff0000)
         await ctx.send(embed=embed)
 
-@client.command()
+@client.command(name="exec")
 async def exec(ctx, *, command: str = None):
     # Check if a command was provided
     if command is None:
@@ -876,29 +876,14 @@ async def exec(ctx, *, command: str = None):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
-
-    # Function to check if the response is from the user who invoked the command
-    def check(m):
-        return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() == 'stop'
-
-    try:
-        # Wait for the user to possibly send 'stop' to terminate the command
-        stop_message = await client.wait_for('message', check=check, timeout=30.0)  # 30 seconds to reply
-        if stop_message:
-            process.terminate()
-            await ctx.send(embed=discord.Embed(title='Command Stopped', description='The command execution has been stopped.', color=0xff0000).set_footer(text='up!exec'))
-    except asyncio.TimeoutError:
-        pass  # If no 'stop' is sent, just continue
-
     stdout, stderr = await process.communicate()
 
-    # Check if the output exceeds the Discord character limit for fields in embeds
+    # Check if the output exceeds the Discord character limit for embeds
     if stdout or stderr:
-        output = stdout.decode() + '\n' + stderr.decode()
-        if len(output) > 1024:  # Discord's limit for fields in embeds is 1024 characters
+        if len(stdout) + len(stderr) > 1010:  # Discord's limit for embeds is 6000 characters
             # Write output to a temporary file
             with open('output.txt', 'w') as file:
-                file.write(output)
+                file.write(stdout.decode() + '\n' + stderr.decode())
             # Send the file
             await ctx.send(file=discord.File('output.txt'))
             # Delete the file
@@ -906,7 +891,10 @@ async def exec(ctx, *, command: str = None):
         else:
             # Prepare the response message
             response = discord.Embed(title='Command Executed', color=0x00ff00)
-            response.add_field(name='Output', value=f'```\n{output}\n```', inline=False)
+            if stdout:
+                response.add_field(name='Output', value=f'```\n{stdout.decode()}\n```', inline=False)
+            if stderr:
+                response.add_field(name='Error and/or warning', value=f'```\n{stderr.decode()}\n```', inline=False)
             response.set_footer(text='up!exec')
             await ctx.send(embed=response)
     else:
