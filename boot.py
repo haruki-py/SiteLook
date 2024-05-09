@@ -766,7 +766,7 @@ async def stats(ctx):
 @client.command(name='botstats')
 # @commands.is_owner()
 async def botstats(ctx):
-    if ctx.author.id not in ownerid or adminid:
+    if ctx.author.id not in adminid or ctx.author.id != ownerid:
         return
         
     # Create the embed
@@ -780,7 +780,7 @@ async def botstats(ctx):
 
 @client.command(name='systemstats')
 async def systemstats(ctx):
-    if ctx.author.id not in ownerid or adminid:
+    if ctx.author.id not in adminid or ctx.author.id != ownerid:
         return
 
     # Gather system information
@@ -829,7 +829,7 @@ async def systemstats(ctx):
 
 @client.command(name="eval")
 async def evaluate(ctx, *, code: str):
-    if ctx.author.id not in ownerid or adminid:
+    if ctx.author.id not in adminid or ctx.author.id != ownerid:
         return
 
     # Remove single or triple backtick code block formatting
@@ -860,6 +860,8 @@ async def evaluate(ctx, *, code: str):
 
 @client.command(name="exec")
 async def exec(ctx, *, command: str = None):
+    if ctx.author.id not in adminid or ctx.author.id != ownerid:
+        return
     # Check if a command was provided
     if command is None:
         embed = discord.Embed(title='Error', description='Please provide a command to execute. Example: up!exec ls -la', color=0xff0000)
@@ -902,5 +904,31 @@ async def exec(ctx, *, command: str = None):
         embed = discord.Embed(title='Command Executed', description='The command was executed successfully, but there was no output.', color=0x00ff00)
         embed.set_footer(text='up!exec')
         await ctx.send(embed=embed)
+
+@client.command()
+async def ping(ctx):
+    # Measure bot latency
+    bot_latency = round(client.latency * 1000)  # Bot latency in milliseconds
+
+    # Measure API latency by sending a message and timing how long it takes
+    start_time = time.perf_counter()
+    message = await ctx.send("Calculating API latency...")
+    end_time = time.perf_counter()
+    api_latency = round((end_time - start_time) * 1000)  # API latency in milliseconds
+    await message.delete()  # Clean up the test message
+
+    # Measure host latency by executing a ping command on the system (example for Unix-based systems)
+    host_ping_result = os.popen('ping -c 1 194.9.6.196').read()  # Replace 'example.com' with your actual host address
+    # Parse the result to extract the ping time
+    host_latency = 'N/A'
+    if 'time=' in host_ping_result:
+        start = host_ping_result.find('time=') + 5
+        end = host_ping_result.find(' ms', start)
+        host_latency = host_ping_result[start:end] + 'ms'
+
+    # Create the embed with latency information
+    embed = discord.Embed(title='Ping', description=f'**Bot Latency: {bot_latency}ms**\n**API Latency: {api_latency}ms**\n**Host Ping: {host_latency}**', color=0x00ff00)
+    embed.set_footer(text='up!ping')
+    await ctx.send(embed=embed)
 
 client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GuqaiK.fpbVPiALpa4amONNuZj6T_Ax-T2wAz-K75UPF8")
