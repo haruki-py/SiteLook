@@ -10,3 +10,4 @@ history.json
 ls.json
 schedules.json
 out.put
+/Commands/__pycache__
