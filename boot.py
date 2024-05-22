@@ -927,7 +927,7 @@ async def ping(ctx):
         host_latency = host_ping_result[start:end] + 'ms'
 
     # Create the embed with latency information
-    embed = discord.Embed(title='Ping', description=f'**Bot Latency: {bot_latency}ms**\n**API Latency: {api_latency}ms**\n**Host Ping: {host_latency}**', color=0x00ff00)
+    embed = discord.Embed(title='Ping', description=f'Bot Latency: {bot_latency}ms\nAPI Latency: {api_latency}ms\nHost Ping : {host_latency}', color=0x00ff00)
     embed.set_footer(text='up!ping')
     await ctx.send(embed=embed)
 
