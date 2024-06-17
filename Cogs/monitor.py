@@ -115,5 +115,5 @@ class MonitorCog(commands.Cog, name="monitor command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(MonitorCog(client))
+async def setup(bot):
+    await bot.add_cog(MonitorCog(bot))

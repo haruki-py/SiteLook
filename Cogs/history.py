@@ -49,5 +49,5 @@ class HistoryCog(commands.Cog, name="history command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(HistoryCog(client))
+async def setup(bot):
+    await bot.add_cog(HistoryCog(bot))

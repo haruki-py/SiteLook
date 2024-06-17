@@ -42,5 +42,5 @@ class EvalCog(commands.Cog, name="eval command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(EvalCog(client))
+async def setup(bot):
+    await bot.add_cog(EvalCog(bot))

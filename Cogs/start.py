@@ -46,5 +46,5 @@ class StartCog(commands.Cog, name="start command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(StartCog(client))
+async def setup(client):
+    await client.add_cog(StartCog(client))

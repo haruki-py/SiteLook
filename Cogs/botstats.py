@@ -26,5 +26,5 @@ class BotstatsCog(commands.Cog, name="botstats command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(BotstatsCog(client))
+async def setup(bot):
+    await bot.add_cog(BotstatsCog(bot))

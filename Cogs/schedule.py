@@ -58,5 +58,5 @@ class ScheduleCog(commands.Cog, name="schedule command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(ScheduleCog(client))
+async def setup(bot):
+    await bot.add_cog(ScheduleCog(bot))

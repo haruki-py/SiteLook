@@ -83,5 +83,5 @@ class AlertCog(commands.Cog, name="alert "):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(AlertCog(client))
+async def setup(bot):
+    await bot.add_cog(AlertCog(bot))

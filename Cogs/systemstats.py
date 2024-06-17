@@ -64,5 +64,5 @@ class SystemstatsCog(commands.Cog, name="systemstats command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(SystemstatsCog(client))
+async def setup(bot):
+    await bot.add_cog(SystemstatsCog(bot))

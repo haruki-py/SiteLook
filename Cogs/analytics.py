@@ -50,5 +50,5 @@ class AnalyticsCog(commands.Cog, name="analytics command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(AnalyticsCog(client))
+async def setup(bot):
+    await bot.add_cog(AnalyticsCog(bot))

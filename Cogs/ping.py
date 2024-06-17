@@ -32,5 +32,5 @@ class PingCog(commands.Cog, name="ping command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(PingCog(client))
+async def setup(bot):
+    await bot.add_cog(PingCog(bot))

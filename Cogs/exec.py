@@ -59,5 +59,5 @@ class ExecCog(commands.Cog, name="exec command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(ExecCog(client))
+async def setup(bot):
+    await bot.add_cog(ExecCog(bot))

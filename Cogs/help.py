@@ -116,5 +116,5 @@ class HelpCog(commands.Cog, name="Help command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(HelpCog(client))
+async def setup(bot):
+    await bot.add_cog(HelpCog(bot))

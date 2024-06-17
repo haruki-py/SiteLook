@@ -4,7 +4,7 @@ import json
 
 # ------------------------ COGS ------------------------ #  
 
-class StatsCog(commands.Cog, name="stats command"):
+class StatsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -37,5 +37,5 @@ class StatsCog(commands.Cog, name="stats command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(StatsCog(client))
+async def setup(bot):
+    await bot.add_cog(StatsCog(bot))

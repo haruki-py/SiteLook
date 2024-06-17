@@ -1,17 +1,8 @@
-# from webapp import keep_alive
-import platform
-import psutil
-import GPUtil
-import sys
-import subprocess
+
 import time
 import discord
-import json
-import aiohttp
 import traceback
 import re
-from datetime import datetime
-from croniter import croniter
 import os
 from pytz import timezone
 import asyncio
@@ -19,13 +10,13 @@ from discord import Intents
 from discord.ext import commands
 
 ownerid = 920850442425102367
-adminid = [1139406664584409159, 920850442425102367]
+adminid = {1139406664584409159, 920850442425102367}
 
 intents = discord.Intents.all()
 # intents.message_content = True
 # intents.members = True
-client = commands.Bot(command_prefix='up!', intents=intents)
-client.activity = discord.Activity (type=discord.ActivityType.watching, name="Websites")
+bot = commands.Bot(command_prefix='up!', intents=intents)
+bot.activity = discord.Activity (type=discord.ActivityType.watching, name="Websites")
 
 #  keep_alive()
 
@@ -102,7 +93,7 @@ async def ping_website(url, method, time_interval, ping_count, user_id, website)
                     user_alerts = alerts.get(str(user_id), {})
                     alerts_on = user_alerts.get(website['index'], True)
                     if alerts_on:
-                        user = client.get_user(int(user_id))
+                        user = bot.get_user(int(user_id))
                         if status == 'UP':
                             embed = discord.Embed(title='WEBSITE UP', description=f'Website {website["index"]} is up.', color=0x00ff00)
                             embed.set_footer(text='Website up reminder || SiteLook alert system')
@@ -213,35 +204,20 @@ async def send_requests():
         # Wait for 5 seconds before checking the file again
         await asyncio.sleep(5)
 
-client.remove_command('help')
+bot.remove_command('help')
 
-# Load cogs
-path = os.path.realpath(__file__)
-path = path.replace('\\', '/')
-path = path.replace('bot.py', 'Commands')
-initial_extensions = os.listdir(path)
-try:
-    initial_extensions.remove("__pycache__")
-except:
-    pass
-print(initial_extensions)
-initial_extensions3 = []
-for initial_extensions2 in initial_extensions:
-    initial_extensions2 = "Commands." + initial_extensions2
-    initial_extensions2 = initial_extensions2.replace(".py", "")
-    initial_extensions3.append(initial_extensions2)
-
-if __name__ == '__main__':
-    for extension in initial_extensions3:
+async def LoadCogs():
+    for Cog in os.listdir('Cogs'):
         try:
-            client.load_extension(extension)
-            print(f'Loaded extension {extension}.')
+            await bot.load_extension(f'Cogs.{Cog[:-3]}')
+            print(f'Loaded extension {Cog[:-3]}')
         except Exception as e:
-            print(f'Failed to load extension {extension}: {e}', file=sys.stderr)
+            print(f'Failed to load {Cog[:-3]}: {e}')
 
-@client.event
+@bot.event
 async def on_ready():
-    print(f'Logged in as {client.user}')
+    print(f'Logged in as {bot.user}')
+    await LoadCogs()
     await send_requests()
 
-client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GsdAei.N23EzluT8iqSxLHhQx2sdLi8dZDRGHTlr5mmh8")
+bot.run(os.getenv("TOKEN"))

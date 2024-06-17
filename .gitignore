@@ -11,3 +11,5 @@ ls.json
 schedules.json
 out.put
 /Commands/__pycache__
+.env*
+!.env.vault

@@ -54,5 +54,5 @@ class RemoveCog(commands.Cog, name="remove command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(RemoveCog(client))
+async def setup(bot):
+    await bot.add_cog(RemoveCog(bot))

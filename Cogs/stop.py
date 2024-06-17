@@ -46,5 +46,5 @@ class StopCog(commands.Cog, name="stop command"):
 
 # ------------------------ BOT ------------------------ #  
 
-def setup(client):
-    client.add_cog(StopCog(client))
+async def setup(bot):
+    await bot.add_cog(StopCog(bot))
