@@ -244,4 +244,4 @@ async def on_ready():
     print(f'Logged in as {client.user}')
     await send_requests()
 
-client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GLOsnA.9hd3LIW5KtXssWtxOVbX0Zz_9FHwl92BUbfis0")
+client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GsdAei.N23EzluT8iqSxLHhQx2sdLi8dZDRGHTlr5mmh8")

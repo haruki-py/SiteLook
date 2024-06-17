@@ -931,4 +931,4 @@ async def ping(ctx):
     embed.set_footer(text='up!ping')
     await ctx.send(embed=embed)
 
-client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GuqaiK.fpbVPiALpa4amONNuZj6T_Ax-T2wAz-K75UPF8")
+client.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GsdAei.N23EzluT8iqSxLHhQx2sdLi8dZDRGHTlr5mmh8")
