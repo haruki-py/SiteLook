@@ -13,3 +13,4 @@ out.put
 /Commands/__pycache__
 .env*
 !.env.vault
+Cogs/__pycache__
