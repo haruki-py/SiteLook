@@ -229,4 +229,4 @@ async def on_ready():
     await LoadCogs()
     await send_requests()
 
-client.run(os.getenv("TOKEN"))
+bot.run(os.getenv("TOKEN"))
