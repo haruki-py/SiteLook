@@ -1,8 +1,17 @@
-
+# from webapp import keep_alive
+import platform
+import psutil
+import GPUtil
+import sys
+import subprocess
 import time
 import discord
+import json
+import aiohttp
 import traceback
 import re
+from datetime import datetime
+from croniter import croniter
 import os
 from pytz import timezone
 import asyncio
@@ -220,4 +229,4 @@ async def on_ready():
     await LoadCogs()
     await send_requests()
 
-bot.run(os.getenv("TOKEN"))
+bot.run("MTEyMjQ1NzYzOTIyNjQ0MTgyOQ.GsdAei.N23EzluT8iqSxLHhQx2sdLi8dZDRGHTlr5mmh8")
