@@ -931,5 +931,4 @@ async def ping(ctx):
     embed.set_footer(text='up!ping')
     await ctx.send(embed=embed)
 
-TOKEN = os.getenv("TOKEN")
-client.run(TOKEN)
+client.run(os.getenv("TOKEN"))
