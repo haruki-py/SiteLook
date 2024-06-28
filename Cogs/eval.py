@@ -11,7 +11,7 @@ class EvalCog(commands.Cog, name="eval command"):
 
     @commands.command(name="eval")
     async def evaluate(self, ctx, *, code: str):
-        if ctx.author.id not in adminid or ctx.author.id != ownerid:
+        if ctx.author.id not in self.bot.adminid or ctx.author.id != self.bot.ownerid:
             return
 
         # Remove single or triple backtick code block formatting
