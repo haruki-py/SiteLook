@@ -18,16 +18,13 @@ import asyncio
 from discord import Intents
 from discord.ext import commands
 
-ownerid = 920850442425102367
-adminid = {1139406664584409159, 920850442425102367}
-
 intents = discord.Intents.all()
 # intents.message_content = True
 # intents.members = True
 bot = commands.Bot(command_prefix='up!', intents=intents)
 bot.activity = discord.Activity (type=discord.ActivityType.watching, name="Websites")
-
-#  keep_alive()
+bot.ownerid = 920850442425102367
+bot.adminid = {1139406664584409159, 920850442425102367}
 
 # Define a function to ping a website with a given method and time interval
 async def ping_website(url, method, time_interval, ping_count, user_id, website):
