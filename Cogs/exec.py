@@ -12,7 +12,7 @@ class ExecCog(commands.Cog, name="exec command"):
 
     @commands.command(name="exec")
     async def exec(self, ctx, *, command: str = None):
-        if ctx.author.id not in adminid or ctx.author.id != ownerid:
+        if ctx.author.id not in self.bot.adminid or ctx.author.id != self.bot.ownerid:
             return
         # Check if a command was provided
         if command is None:
