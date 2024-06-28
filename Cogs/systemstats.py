@@ -15,7 +15,7 @@ class SystemstatsCog(commands.Cog, name="systemstats command"):
 
     @commands.command(name='systemstats')
     async def systemstats(self, ctx):
-        if ctx.author.id not in adminid or ctx.author.id != ownerid:
+        if ctx.author.id not in self.bot.adminid or ctx.author.id != self.bot.ownerid:
             return
 
         # Gather system information
