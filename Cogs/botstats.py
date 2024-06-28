@@ -12,7 +12,7 @@ class BotstatsCog(commands.Cog, name="botstats command"):
     @commands.command(name='botstats')
     # @commands.is_owner()
     async def botstats(self, ctx):
-        if ctx.author.id not in adminid or ctx.author.id != ownerid:
+        if ctx.author.id not in self.bot.adminid or ctx.author.id != self.bot.ownerid:
             return
             
         # Create the embed
