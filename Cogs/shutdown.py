@@ -3,7 +3,7 @@ from discord.ext import commands
 
 # ------------------------ COGS ------------------------ #  
 
-class ExecCog(commands.Cog, name="exec command"):
+class ShutdownCog(commands.Cog, name="shutdown command"):
     def __init__(self, bot):
         self.bot = bot
 
@@ -16,3 +16,8 @@ class ExecCog(commands.Cog, name="exec command"):
       embed = discord.Embed(title='Shutdown', description='Shutting down the bot...', color=0xff0000)
       await ctx.send(embed=embed)
       await self.bot.close()
+
+# ------------------------ BOT ------------------------ #  
+
+async def setup(bot):
+    await bot.add_cog(ShutdownCog(bot))
