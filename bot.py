@@ -17,6 +17,9 @@ from pytz import timezone
 import asyncio
 from discord import Intents
 from discord.ext import commands
+from dotenv import load_dotenv
+
+load_dotenv()
 
 intents = discord.Intents.all()
 # intents.message_content = True
