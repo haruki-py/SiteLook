@@ -216,12 +216,15 @@ async def send_requests():
 bot.remove_command('help')
 
 async def LoadCogs():
-    for Cog in os.listdir('Cogs'):
+    for cog in os.listdir('Cogs'):
+        cog_path = os.path.join('Cogs', cog)
+        if os.path.isdir(cog_path) or not cog.endswith('.py'):
+            continue
         try:
-            await bot.load_extension(f'Cogs.{Cog[:-3]}')
-            print(f'Loaded extension {Cog[:-3]}')
+            await bot.load_extension(f'Cogs.{cog[:-3]}')
+            print(f'Loaded extension {cog[:-3]}')
         except Exception as e:
-            print(f'Failed to load {Cog[:-3]}: {e}')
+            print(f'Failed to load {cog[:-3]}: {e}')
 
 @bot.event
 async def on_ready():
