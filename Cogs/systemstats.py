@@ -5,36 +5,28 @@ import GPUtil
 import platform
 import subprocess
 
-# ------------------------ COGS ------------------------ #  
-
 class SystemstatsCog(commands.Cog, name="systemstats command"):
     def __init__(self, bot):
         self.bot = bot
-
-# ------------------------------------------------------ #  
 
     @commands.command(name='systemstats')
     async def systemstats(self, ctx):
         if ctx.author.id not in self.bot.adminid or ctx.author.id != self.bot.ownerid:
             return
 
-        # Gather system information
         cpu_freq = psutil.cpu_freq()
         virtual_memory = psutil.virtual_memory()
         disk_usage = psutil.disk_usage('/')
         
-        # Get detailed OS information
         os_info = platform.uname()
         os_name = platform.system()
         os_version = platform.release()
         
-        # Get CPU model name
         if os_info.system == "Windows":
             cpu_model = platform.processor()
         else:
             cpu_model = subprocess.getoutput("cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d ':' -f 2").strip()
         
-        # Get GPU details
         try:
             GPUs = GPUtil.getGPUs()
             if GPUs:
@@ -44,7 +36,6 @@ class SystemstatsCog(commands.Cog, name="systemstats command"):
         except Exception as e:
             gpu_info = f'Error retrieving GPU information: {str(e)}'
 
-        # Create the embed with system stats
         embed = discord.Embed(title='System Stats', color=0x00ff00)
         embed.add_field(name='OS', value=os_name, inline=True)
         embed.add_field(name='OS Version', value=os_version, inline=True)
@@ -59,10 +50,7 @@ class SystemstatsCog(commands.Cog, name="systemstats command"):
         embed.add_field(name='Used Disk Space', value=f'{disk_usage.used / (1024 ** 3):.2f} GB ({disk_usage.percent}%)', inline=True)
         embed.add_field(name='GPU', value=gpu_info, inline=True)
 
-        # Send the embed
         await ctx.send(embed=embed)
-
-# ------------------------ BOT ------------------------ #  
 
 async def setup(bot):
     await bot.add_cog(SystemstatsCog(bot))

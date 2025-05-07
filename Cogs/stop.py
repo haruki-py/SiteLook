@@ -1,50 +1,139 @@
 import discord
+import sqlite3
 from discord.ext import commands
-import json
-
-# ------------------------ COGS ------------------------ #  
 
 class StopCog(commands.Cog, name="stop command"):
     def __init__(self, bot):
         self.bot = bot
 
-# ------------------------------------------------------ # 
+    def atomic_db_write(self, query, params=()):
+        """Execute atomic database operation with rollback"""
+        conn = None
+        try:
+            conn = sqlite3.connect('monitoring.db')
+            c = conn.cursor()
+            c.execute(query, params)
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Database error: {str(e)}")
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if conn:
+                conn.close()
+
+    async def get_ordered_indexes(self, user_id):
+        """Get website indexes in creation order"""
+        conn = sqlite3.connect('monitoring.db')
+        try:
+            c = conn.cursor()
+            c.execute('''SELECT website_index FROM websites 
+                        WHERE user_id = ? 
+                        ORDER BY rowid ASC''', (user_id,))
+            return [row[0] for row in c.fetchall()]
+        finally:
+            conn.close()
 
     @commands.command()
-    async def stop(self, ctx, index: int = None):
-        if index is None:
-            embed = discord.Embed(title='Error', description='Please include the index of the website to stop. Example: up!stop 1\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
+    async def stop(self, ctx, index: str = None):
+        """Pause monitoring for a website"""
+        user_id = str(ctx.author.id)
+        
+        if not index:
+            embed = discord.Embed(
+                title='Error',
+                description='Please include an index. Example: `up!stop 1`\nUse `up!stats` to view your websites.',
+                color=0xff0000
+            )
             embed.set_footer(text='up!stop')
             await ctx.send(embed=embed)
             return
-        with open('websites.json', 'r') as f:
-            websites = json.load(f)
-        user_websites = websites.get(str(ctx.author.id), [])
-        if not user_websites:
-            embed = discord.Embed(title='Error', description='You have not added any websites to monitor', color=0xff0000)
+
+        if not index.isdigit():
+            embed = discord.Embed(
+                title='Error',
+                description='Index must be a positive number',
+                color=0xff0000
+            )
             embed.set_footer(text='up!stop')
             await ctx.send(embed=embed)
             return
-        if index < 1 or index > len(user_websites):
-            embed = discord.Embed(title='Error', description=f'Invalid index. Please enter a number between 1 and {len(user_websites)}\nIf you do not know the index, use the up!stats command to view your monitored websites.', color=0xff0000)
-            embed.set_footer(text='up!stop')
-            await ctx.send(embed=embed)
-            return
-        website = user_websites[index - 1]
-        if 'stopped' not in website or not website['stopped']:
-            website['stopped'] = True
-            websites[str(ctx.author.id)] = user_websites
-            with open('websites.json', 'w') as f:
-                json.dump(websites, f)
-            embed = discord.Embed(title='Success', description=f'Website {index} stopped', color=0x00ff00)
-            embed.set_footer(text='up!stop')
-            await ctx.send(embed=embed)
-        else:
-            embed = discord.Embed(title='Error', description=f'Website {index} is already stopped', color=0xff0000)
+
+        try:
+            position = int(index)
+            indexes = await self.get_ordered_indexes(user_id)
+            
+            if not indexes:
+                raise ValueError("You have no websites to stop")
+                
+            if position < 1 or position > len(indexes):
+                raise ValueError(f"Invalid index (1-{len(indexes)})")
+                
+            website_index = indexes[position - 1]
+            
+            conn = sqlite3.connect('monitoring.db')
+            c = conn.cursor()
+            c.execute('''SELECT stopped FROM websites 
+                        WHERE user_id = ? AND website_index = ?''',
+                     (user_id, website_index))
+            result = c.fetchone()
+            
+            if not result:
+                raise ValueError("Website not found")
+                
+            if result[0]:
+                embed = discord.Embed(
+                    title='Error',
+                    description=f'Website #{position} is already paused',
+                    color=0xff0000
+                )
+                embed.set_footer(text='up!stop')
+                await ctx.send(embed=embed)
+                return
+
+            success = self.atomic_db_write(
+                '''UPDATE websites SET stopped = 1 
+                   WHERE user_id = ? AND website_index = ?''',
+                (user_id, website_index)
+            )
+            
+            if not success:
+                raise RuntimeError("Failed to update database")
+
+            embed = discord.Embed(
+                title='Success',
+                description=f'Paused monitoring for website #{position}',
+                color=0x00ff00
+            )
             embed.set_footer(text='up!stop')
             await ctx.send(embed=embed)
 
-# ------------------------ BOT ------------------------ #  
+        except ValueError as e:
+            error_msg = str(e)
+            if "no websites" in error_msg.lower():
+                description = 'You have no websites to pause'
+            else:
+                description = error_msg
+                
+            embed = discord.Embed(
+                title='Error',
+                description=description,
+                color=0xff0000
+            )
+            embed.set_footer(text='up!stop')
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            print(f"Stop command error: {str(e)}")
+            embed = discord.Embed(
+                title='Error',
+                description='Failed to pause monitoring',
+                color=0xff0000
+            )
+            embed.set_footer(text='up!stop')
+            await ctx.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(StopCog(bot))

@@ -1,10 +1,8 @@
 discord.py
 aiohttp
-flask
 croniter
 pytz
-requests
-pymongo
-motor
 psutil
 gputil
+discord-ext-menus
+platform

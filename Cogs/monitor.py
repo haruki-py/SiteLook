@@ -1,119 +1,211 @@
 import discord
+import sqlite3
+import re
 from discord.ext import commands
-import json
-
-# ------------------------ COGS ------------------------ #  
 
 class MonitorCog(commands.Cog, name="monitor command"):
     def __init__(self, bot):
         self.bot = bot
+        self.FACTOR = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 604800}
 
-# ------------------------------------------------------ #  
+    def atomic_db_write(self, query, params=()):
+        """Execute atomic database write operation"""
+        conn = None
+        try:
+            conn = sqlite3.connect('monitoring.db')
+            c = conn.cursor()
+            c.execute(query, params)
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Database error: {str(e)}")
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if conn:
+                conn.close()
+
+    async def get_next_index(self, user_id):
+        """Get next available index for user's websites"""
+        conn = sqlite3.connect('monitoring.db')
+        try:
+            c = conn.cursor()
+            c.execute('''SELECT MAX(website_index) FROM websites 
+                       WHERE user_id = ?''', (user_id,))
+            max_index = c.fetchone()[0]
+            return (max_index or 0) + 1
+        finally:
+            conn.close()
 
     @commands.command()
     async def monitor(self, ctx):
-        split_message = ctx.message.content.split()
-        if len(split_message) < 2:
-            embed = discord.Embed(title='Error', description='Please include a website to monitor. Example: up!monitor https://example.com', color=0xff0000)
+        """Add a new website to monitor"""
+        if len(ctx.message.content.split()) < 2:
+            embed = discord.Embed(
+                title='Error',
+                description='Please include a website URL. Example: `up!monitor https://example.com`',
+                color=0xff0000
+            )
             embed.set_footer(text='up!monitor')
             await ctx.send(embed=embed)
             return
-        website = split_message[1]
-        with open('websites.json', 'r') as f:
-            websites = json.load(f)
-        user_websites = websites.get(str(ctx.author.id), [])
-        for user_website in user_websites:
-            if user_website['url'] == website:
-                embed = discord.Embed(title='Error', description='That website is already being monitored', color=0xff0000)
+
+        website = ctx.message.content.split()[1].strip()
+        user_id = str(ctx.author.id)
+
+        conn = sqlite3.connect('monitoring.db')
+        try:
+            c = conn.cursor()
+            c.execute('''SELECT 1 FROM websites 
+                        WHERE user_id = ? AND url COLLATE NOCASE = ?''',
+                     (user_id, website))
+            if c.fetchone():
+                embed = discord.Embed(
+                    title='Error',
+                    description='This website is already being monitored',
+                    color=0xff0000
+                )
                 embed.set_footer(text='up!monitor')
                 await ctx.send(embed=embed)
                 return
-        embed = discord.Embed(title='Method', description='''Which one? 
-    1. HEAD
-    2. GET
-    3. POST? 
-    Reply with the 1, 2 or 3.''', color=0x00ff00)
-        embed.set_footer(text='up!monitor')
-        await ctx.send(embed=embed)
-        def check(m):
-            return m.author == ctx.author and m.channel == ctx.channel and m.content in ['1', '2', '3']
+        finally:
+            conn.close()
+
         try:
-            response = await self.bot.wait_for('message', check=check, timeout=30.0)
-        except asyncio.TimeoutError:
-            embed = discord.Embed(title='Error', description='Sorry, you took too long to respond.', color=0xff0000)
-            embed.set_footer(text='up!monitor')
-            await ctx.send(embed=embed)
+            method = await self.get_http_method(ctx)
+            if not method:
+                return
+        except Exception as e:
+            print(f"Method selection error: {str(e)}")
             return
-        method = ''
-        if response.content == '1':
-            method = 'HEAD'
-        elif response.content == '2':
-            method = 'GET'
-        elif response.content == '3':
-            method = 'POST'
 
-        # Ask the user for the time interval
-        embed = discord.Embed(title='Time Interval', description='''How often do you want to ping the website? 
-    Enter a number followed by a unit of time. For example: 
-    s for seconds
-    m for minute
-    h for hour
-    d for day
-    w for week
-    You can also use decimal points to specify fractions of a unit. For example:
-    0.5m for 30 seconds
-    6.9h for 6 hours and 54 minutes
-    The minimum interval is 1 minute.''', color=0x00ff00)
-        embed.set_footer(text='up!monitor')
-        await ctx.send(embed=embed)
-
-        # Use a regular expression to check the format of the time interval
-        def check(m):
-            return m.author == ctx.author and m.channel == ctx.channel and re.match(r'\d+(\.\d+)?[smhdw]$', m.content)
         try:
-            response = await self.bot.wait_for('message', check=check, timeout=30.0)
-        except asyncio.TimeoutError:
-            embed = discord.Embed(title='Error', description='Sorry, you took too long to respond.', color=0xff0000)
+            seconds = await self.get_time_interval(ctx)
+            if not seconds:
+                return
+        except Exception as e:
+            print(f"Interval error: {str(e)}")
+            return
+
+        try:
+            new_index = await self.get_next_index(user_id)
+        except Exception as e:
+            print(f"Index error: {str(e)}")
+            embed = discord.Embed(
+                title='Error',
+                description='Failed to generate website index',
+                color=0xff0000
+            )
             embed.set_footer(text='up!monitor')
             await ctx.send(embed=embed)
             return
 
-        # Convert the time interval to seconds and store it in the websites.json file
-        time_interval = response.content
-        unit = time_interval[-1]
-        factor = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 604800}
-        try:
-            number = float(time_interval[:-1])
-            seconds = number * factor[unit]
-            if seconds < 60:
-                raise ValueError('Minimum time interval is 1 minute. Please try again')
-        except ValueError as e:
-            embed = discord.Embed(title='Error', description=f'{e}', color=0xff0000)
+        success = self.atomic_db_write(
+            '''INSERT INTO websites 
+               (user_id, url, method, time_interval, website_index, stopped) 
+               VALUES (?, ?, ?, ?, ?, 0)''',
+            (user_id, website, method, seconds, new_index)
+        )
+
+        if not success:
+            embed = discord.Embed(
+                title='Error',
+                description='Failed to save website configuration',
+                color=0xff0000
+            )
             embed.set_footer(text='up!monitor')
             await ctx.send(embed=embed)
             return
 
-        # Generate a new index for the website by finding the maximum index of existing websites and adding 1
-        max_index = max((int(user_website['index']) for user_website in user_websites), default=0)
-        new_index = str(max_index + 1)
-        user_websites.append({'url': website, 'method': method, 'time_interval': seconds, 'index': new_index})
-        websites[str(ctx.author.id)] = user_websites
-        with open('websites.json', 'w') as f:
-            json.dump(websites, f)
-
-        # Delete the user's messages if possible
         try:
             await ctx.message.delete()
-            await response.delete()
         except discord.Forbidden:
             pass
 
-        # Send a success message
-        embed = discord.Embed(title='Success', description='Website added', color=0x00ff00)
+        embed = discord.Embed(
+            title='Success',
+            description=f'Now monitoring {website} (#{new_index})',
+            color=0x00ff00
+        )
         embed.set_footer(text='up!monitor')
         await ctx.send(embed=embed)
 
-# ------------------------ BOT ------------------------ #  
+    async def get_http_method(self, ctx):
+        """Get HTTP method from user"""
+        embed = discord.Embed(
+            title='Method',
+            description='Choose monitoring method:\n1. HEAD\n2. GET\n3. POST',
+            color=0x00ff00
+        )
+        embed.set_footer(text='up!monitor')
+        msg = await ctx.send(embed=embed)
+
+        try:
+            response = await self.bot.wait_for(
+                'message',
+                timeout=30.0,
+                check=lambda m: m.author == ctx.author and 
+                               m.channel == ctx.channel and 
+                               m.content in ['1', '2', '3']
+            )
+            return ['HEAD', 'GET', 'POST'][int(response.content)-1]
+        except asyncio.TimeoutError:
+            embed = discord.Embed(
+                title='Error',
+                description='Response timed out',
+                color=0xff0000
+            )
+            embed.set_footer(text='up!monitor')
+            await msg.edit(embed=embed)
+            return None
+
+    async def get_time_interval(self, ctx):
+        """Get and validate time interval"""
+        embed = discord.Embed(
+            title='Interval',
+            description='Enter monitoring interval (e.g., 5m, 1h):\nMinimum 60 seconds',
+            color=0x00ff00
+        )
+        embed.set_footer(text='up!monitor')
+        msg = await ctx.send(embed=embed)
+
+        try:
+            response = await self.bot.wait_for(
+                'message',
+                timeout=30.0,
+                check=lambda m: m.author == ctx.author and 
+                               m.channel == ctx.channel and 
+                               re.match(r'^\d+(\.\d+)?[smhdw]$', m.content)
+            )
+            interval = response.content.strip().lower()
+            unit = interval[-1]
+            number = float(interval[:-1])
+            seconds = number * self.FACTOR[unit]
+            
+            if seconds < 60:
+                raise ValueError('Minimum interval is 1 minute')
+                
+            return int(seconds)
+            
+        except ValueError as e:
+            embed = discord.Embed(
+                title='Error',
+                description=str(e),
+                color=0xff0000
+            )
+            embed.set_footer(text='up!monitor')
+            await msg.edit(embed=embed)
+            return None
+        except asyncio.TimeoutError:
+            embed = discord.Embed(
+                title='Error',
+                description='Response timed out',
+                color=0xff0000
+            )
+            embed.set_footer(text='up!monitor')
+            await msg.edit(embed=embed)
+            return None
 
 async def setup(bot):
     await bot.add_cog(MonitorCog(bot))
